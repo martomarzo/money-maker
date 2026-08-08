@@ -32,6 +32,10 @@ services:
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: ${AUTH_URL}
+    volumes:
+      # Extracted bank-statement JSON for /import (gitignored, copied to the
+      # host manually — see CLAUDE.md session status).
+      - /opt/money-maker/imports:/app/data/imports:ro
     restart: unless-stopped
 
   postgres:
