@@ -132,16 +132,46 @@ This is the riskiest part, so the design is deliberately boring:
 
 Real history lives in Revolut, Wise, Itaú (Paraguay), and Santander (Argentina) — importing it early makes reports and budgets useful from day one.
 
-- **One generic import engine + per-bank profiles.** A profile declares: column mapping, date format, decimal style (`1.234,56` vs `1,234.56`), amount convention (single signed column vs separate Débito/Crédito columns), header language, currency handling.
-- v1 profiles:
-  - **Revolut** — CSV, ISO dates, single signed amount column, per-currency.
-  - **Wise** — CSV, per-currency balance statements, exchange metadata on conversions.
-  - **Itaú Paraguay** — Spanish headers, dd/mm/yyyy, separate debit/credit columns, PYG (no decimals).
-  - **Santander Argentina** — Spanish headers, dd/mm/yyyy, decimal comma, separate debit/credit columns, ARS.
-- Accepts **CSV and XLSX** (SheetJS) — the Latin banks usually export XLS, no manual conversion step.
-- Flow: upload → pick account + profile (auto-detected from headers when possible) → preview parsed rows → dedupe check → import.
-- **Idempotent re-imports:** each imported row stores a source hash (account + date + amount + description); re-uploading the same or an overlapping statement skips existing rows. The dedupe heuristic also flags manually-entered duplicates (same account + date + amount).
-- Imported rows land uncategorized; bulk-categorize in the preview (payee-contains suggestions).
+**Real formats (inspected 2026-08-08, files in `BANCOS/` — gitignored, never committed):**
+
+| Source | Actual format | Key traits |
+|---|---|---|
+| Revolut | CSV (one file, all history) | `Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance`. ISO datetimes, signed dot-decimal amounts, `Currency` per row. Filter `State=COMPLETED`. No stable row ID → hash. `Exchange` rows are internal currency conversions (transfer legs, not income/expense). |
+| Wise | CSV per currency | Rich: stable **`TransferWise ID`** (use as dedupe key directly), `dd-MM-yyyy` dates, signed amounts, `Merchant`, `Exchange From/To/Rate`, `Total fees`, `Transaction Type`. Fees are separate linked `FEE-*` rows → auto-categorize as Fees. Card rows carry the **original foreign amount+currency** ("Card transaction of 10.70 GBP…") — parse it out. |
+| Itaú Paraguay | `.xls` that is actually an **HTML fragment** | Credit-card statement, all amounts PYG (dot = thousands, 0 decimals, negative = payment/refund). Header block: card name, `cierre`, `vencimiento`. `<h4>` sections: `Pagos`, `Compras … en el exterior`, `Compras … en Paraguay` — repeated per cardholder (titular + **adicional**, separated by an `adicional: <last4> <NAME>` row). Columns: fec. operación / fec. proceso / nº cupón / detalle / monto. Foreign purchases are pre-converted to PYG (original currency not present). |
+| Santander Argentina — account | **PDF** (monthly "Mi resumen de cuenta") | `pdftotext -layout` extracts well. Two sections: `Movimientos en pesos` (ARS) and `Movimientos en dólares` (USD) → two app accounts from one PDF. `1.234,56` decimals, `dd/MM/yy` dates, `Comprobante` number, multi-line descriptions, running `Saldo` column (use to **validate** the parse). |
+| Santander Argentina — Visa | **PDF** (resumen de tarjeta) | Hardest: dual `$`/`U$S` columns (→ Visa ARS + Visa USD card accounts), `25 Julio 04` = yy/month-name/dd dates, tax lines (IIBB/IVA percepciones), payments with FX rate. Text extraction is noisy — build last, tolerate manual fallback. |
+
+**Architecture — `src/lib/import/`:**
+
+- **Parser adapters, one per source**, sharing a tiny contract: `detect(filename, content) → confidence` and `parse(content) → ParsedStatement { source, accountHints[], rows: NormalizedRow[] }`. Not column-map config — Itaú/Santander need real parsing code; declarative config only works for the CSVs.
+- `NormalizedRow`: `date`, `description`, `merchant?`, `amountMinor` (signed), `currency`, `kind` (purchase | payment | fee | exchange | transfer | tax | refund), `originalAmount?/originalCurrency?` (Wise card rows), `cardholder?` (Itaú adicional), `place?` (Itaú exterior/Paraguay), `sourceId?` (Wise ID, Santander comprobante, Itaú cupón), `raw` (verbatim line/cells for audit).
+- Parsing runs **server-side** (upload endpoint). PDFs: extract text with `pdf-parse`/pdfjs, then per-bank regex over layout text. Itaú: parse the HTML with a lightweight DOM (linkedom) — it is not XLS, never was; no SheetJS needed for v1 (no real XLSX source exists).
+- **Validation built in:** where the source has running balances (Revolut, Wise, Santander account), the parser re-computes and flags any gap — catches both parser bugs and truncated files.
+
+**Schema additions (migration 0002):**
+
+- `import_batches` table: id, household_id, account_id, source, filename, file_sha256, date range, row counts (imported/skipped-dupe/skipped-filtered), created_by, created_at. `transactions.import_batch_id` → FK; enables "undo this import".
+- `transactions.original_amount` + `original_currency` (nullable): **never lose what currency a purchase was really made in** — the account leg stays in the account's native currency (schema rule), the original foreign amount is preserved structurally, not in free-text notes.
+- `category_rules` table (sync-tracked): household_id, `match_text` (case/accent-insensitive substring on description/merchant), optional account/currency filter, category_id, priority. Applied at import preview time as *suggestions*; user confirms/overrides in preview.
+
+**Categorization (restaurants, services, …):**
+
+- Categories are already household rows (seeded defaults, tree, editable). Add the missing **category management UI** (`/settings/categories`): rename, re-icon, re-parent, add, archive.
+- Rules engine: when the user (re)categorizes an imported row in preview, offer "always categorize *MERCADONA* as Groceries" → creates a `category_rule`. Next imports auto-suggest. Ship a small generic merchant seed list (Glovo→Delivery, farmacia→Pharmacy, YouTube/Spotify/HBO→Subscriptions, airlines→Travel, …) as *rules*, so they're editable like everything else.
+- Uncertain rows land as `Other` + flagged "needs review" filter in the transactions list.
+
+**Import flow (UI at `/import`):**
+
+1. Upload file(s) → adapter auto-detected (confidence + override dropdown).
+2. Map to account(s) — Santander account PDF proposes two (ARS/USD); first import of a source can create the account inline (type/currency prefilled from the file).
+3. Preview table: parsed rows, dedupe status (`source_hash` = sha256 of `sourceId ?? date|amount|currency|description|n-th-occurrence`), suggested categories (rules), transfer detection, per-row include/exclude.
+4. **Transfer handling:** rows that are movements between own accounts (Revolut `Exchange`, Wise "Sent money to Martin", Santander "Pago tarjeta de crédito", Itaú `SU PAGO`) must NOT count as income/expense. Heuristic marks them `transfer`; matching the two legs across accounts (same |amount|, ±3 days, opposite signs) links them; unmatched ones import as unlinked transfer legs to pair up later.
+5. Commit → one `import_batch`, transactions inserted with `source_hash` (DB unique index makes re-imports idempotent), FX backfill queued.
+
+**Historical FX backfill (new problem — history reaches back to 2024):** open.er-api.com free tier has no historical endpoint. Backfill strategy per currency: frankfurter.app (ECB) for EUR/USD history; BCRA's free API for official USD/ARS; BCP Paraguay publishes PYG reference rates. A one-time `scripts/backfill-fx.ts` populates `fx_rates` for the imported date range; anything still missing uses nearest-available rate and is marked approximate (`fx_rate_to_base` still set — reports work).
+
+**Build order:** Wise (richest, stable IDs) → Revolut → Itaú (HTML) → Santander account PDF → Santander Visa PDF. Golden-file unit tests per adapter using **synthetic fixtures** in `tests/fixtures/import/` that mirror the real layouts — real files stay out of git.
 
 **Milestone: full multi-bank history in the app; reports reflect reality.**
 

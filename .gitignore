@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Real bank exports live here on each machine — personal data, never committed
 data/imports/
+/BANCOS/
+
+# Python bytecode (extraction scripts)
+__pycache__/
