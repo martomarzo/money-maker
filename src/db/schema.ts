@@ -176,7 +176,8 @@ export const transactions = pgTable(
       .notNull()
       .references(() => users.id),
     type: transactionType("type").notNull(),
-    // Always positive, in the account's native currency; `type` gives the sign.
+    // In the account's native currency. expense/income: always positive, `type`
+    // gives the sign. transfer: signed — negative = outflow leg, positive = inflow leg.
     amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
     currency: char("currency", { length: 3 }).notNull(),
     date: date("date").notNull(),

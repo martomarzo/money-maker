@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { db } from "@/db";
@@ -36,6 +37,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </button>
         </form>
       </header>
+      <nav className="flex gap-4 border-b border-black/10 px-4 py-2 text-sm dark:border-white/15">
+        <Link href="/" className="font-medium hover:underline">
+          Dashboard
+        </Link>
+        <Link href="/accounts" className="font-medium hover:underline">
+          Accounts
+        </Link>
+        <Link href="/transactions" className="font-medium hover:underline">
+          Transactions
+        </Link>
+      </nav>
       <main className="flex flex-1 flex-col px-4 py-6">{children}</main>
     </div>
   );

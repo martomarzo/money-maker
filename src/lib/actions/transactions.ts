@@ -1,0 +1,287 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { db } from "@/db";
+import { accounts, households, transactions } from "@/db/schema";
+import { centsToDecimalString, toCents } from "@/lib/domain/money";
+import { getRate } from "@/lib/fx";
+import { requireMembership } from "@/lib/session";
+import type { ActionResult } from "./auth";
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date");
+
+const entrySchema = z.object({
+  type: z.enum(["expense", "income"]),
+  accountId: z.uuid(),
+  amount: z.string().min(1, "Enter an amount"),
+  date: isoDate,
+  categoryId: z.uuid().optional().or(z.literal("").transform(() => undefined)),
+  payee: z.string().max(120).optional().or(z.literal("").transform(() => undefined)),
+  notes: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
+  visibility: z.enum(["shared", "personal"]).default("shared"),
+});
+
+const transferSchema = z.object({
+  fromAccountId: z.uuid(),
+  toAccountId: z.uuid(),
+  amount: z.string().min(1, "Enter an amount"),
+  toAmount: z.string().optional().or(z.literal("").transform(() => undefined)),
+  date: isoDate,
+  notes: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
+});
+
+/** Account usable for posting by this user: in household, not deleted, and
+ *  either joint or owned by them. */
+async function usableAccount(householdId: string, userId: string, accountId: string) {
+  return db.query.accounts.findFirst({
+    where: and(
+      eq(accounts.id, accountId),
+      eq(accounts.householdId, householdId),
+      isNull(accounts.deletedAt),
+      or(isNull(accounts.ownerUserId), eq(accounts.ownerUserId, userId)),
+    ),
+  });
+}
+
+function parsePositiveAmount(raw: string, currency: string): number | null {
+  try {
+    const cents = toCents(raw, currency);
+    return cents > 0 ? cents : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createTransaction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { userId, householdId } = await requireMembership();
+  const parsed = entrySchema.safeParse({
+    type: formData.get("type"),
+    accountId: formData.get("accountId"),
+    amount: formData.get("amount"),
+    date: formData.get("date"),
+    categoryId: formData.get("categoryId") ?? undefined,
+    payee: formData.get("payee") ?? undefined,
+    notes: formData.get("notes") ?? undefined,
+    visibility: formData.get("visibility") ?? "shared",
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  const account = await usableAccount(householdId, userId, parsed.data.accountId);
+  if (!account) return { ok: false, error: "Account not found or not yours" };
+  const currency = account.currency.trim();
+
+  const cents = parsePositiveAmount(parsed.data.amount, currency);
+  if (cents == null) return { ok: false, error: "Amount must be a positive number" };
+
+  const household = await db.query.households.findFirst({
+    where: eq(households.id, householdId),
+  });
+  const rate = await getRate(
+    parsed.data.date,
+    currency,
+    household!.baseCurrency.trim(),
+  );
+
+  await db.insert(transactions).values({
+    id: randomUUID(),
+    householdId,
+    accountId: account.id,
+    createdByUserId: userId,
+    type: parsed.data.type,
+    amount: centsToDecimalString(cents, currency),
+    currency,
+    date: parsed.data.date,
+    categoryId: parsed.data.categoryId,
+    payee: parsed.data.payee,
+    notes: parsed.data.notes,
+    visibility: parsed.data.visibility,
+    fxRateToBase: rate == null ? null : rate.toFixed(8),
+  });
+
+  revalidatePath("/transactions");
+  revalidatePath("/accounts");
+  return { ok: true };
+}
+
+export async function createTransfer(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { userId, householdId } = await requireMembership();
+  const parsed = transferSchema.safeParse({
+    fromAccountId: formData.get("fromAccountId"),
+    toAccountId: formData.get("toAccountId"),
+    amount: formData.get("amount"),
+    toAmount: formData.get("toAmount") ?? undefined,
+    date: formData.get("date"),
+    notes: formData.get("notes") ?? undefined,
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  if (parsed.data.fromAccountId === parsed.data.toAccountId) {
+    return { ok: false, error: "Pick two different accounts" };
+  }
+
+  const [from, to] = await Promise.all([
+    usableAccount(householdId, userId, parsed.data.fromAccountId),
+    usableAccount(householdId, userId, parsed.data.toAccountId),
+  ]);
+  if (!from || !to) return { ok: false, error: "Account not found or not yours" };
+  const fromCurrency = from.currency.trim();
+  const toCurrency = to.currency.trim();
+
+  const fromCents = parsePositiveAmount(parsed.data.amount, fromCurrency);
+  if (fromCents == null) return { ok: false, error: "Amount must be a positive number" };
+
+  let toCentsValue: number | null;
+  if (fromCurrency === toCurrency) {
+    toCentsValue = parsed.data.toAmount
+      ? parsePositiveAmount(parsed.data.toAmount, toCurrency)
+      : fromCents;
+  } else {
+    if (!parsed.data.toAmount) {
+      return {
+        ok: false,
+        error: `Enter the received amount in ${toCurrency} (cross-currency transfer)`,
+      };
+    }
+    toCentsValue = parsePositiveAmount(parsed.data.toAmount, toCurrency);
+  }
+  if (toCentsValue == null) {
+    return { ok: false, error: "Received amount must be a positive number" };
+  }
+
+  const outId = randomUUID();
+  const inId = randomUUID();
+  const shared = {
+    householdId,
+    createdByUserId: userId,
+    type: "transfer" as const,
+    date: parsed.data.date,
+    notes: parsed.data.notes,
+    visibility: "shared" as const,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx.insert(transactions).values({
+      ...shared,
+      id: outId,
+      accountId: from.id,
+      amount: centsToDecimalString(-fromCents, fromCurrency),
+      currency: fromCurrency,
+      transferPeerId: inId,
+    });
+    await tx.insert(transactions).values({
+      ...shared,
+      id: inId,
+      accountId: to.id,
+      amount: centsToDecimalString(toCentsValue, toCurrency),
+      currency: toCurrency,
+      transferPeerId: outId,
+    });
+  });
+
+  revalidatePath("/transactions");
+  revalidatePath("/accounts");
+  return { ok: true };
+}
+
+export async function updateTransaction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { userId, householdId } = await requireMembership();
+  const id = String(formData.get("id") ?? "");
+
+  const existing = await db.query.transactions.findFirst({
+    where: and(
+      eq(transactions.id, id),
+      eq(transactions.householdId, householdId),
+      isNull(transactions.deletedAt),
+    ),
+  });
+  if (!existing) return { ok: false, error: "Transaction not found" };
+  if (existing.type === "transfer") {
+    return { ok: false, error: "Delete and recreate transfers to change them" };
+  }
+  const account = await usableAccount(householdId, userId, existing.accountId);
+  if (!account) return { ok: false, error: "Not your transaction to edit" };
+
+  const parsed = entrySchema.safeParse({
+    type: formData.get("type") ?? existing.type,
+    accountId: existing.accountId,
+    amount: formData.get("amount"),
+    date: formData.get("date"),
+    categoryId: formData.get("categoryId") ?? undefined,
+    payee: formData.get("payee") ?? undefined,
+    notes: formData.get("notes") ?? undefined,
+    visibility: formData.get("visibility") ?? existing.visibility,
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  const currency = existing.currency.trim();
+  const cents = parsePositiveAmount(parsed.data.amount, currency);
+  if (cents == null) return { ok: false, error: "Amount must be a positive number" };
+
+  // Re-snapshot the rate if the date changed.
+  let fxRateToBase = existing.fxRateToBase;
+  if (parsed.data.date !== existing.date) {
+    const household = await db.query.households.findFirst({
+      where: eq(households.id, householdId),
+    });
+    const rate = await getRate(parsed.data.date, currency, household!.baseCurrency.trim());
+    fxRateToBase = rate == null ? null : rate.toFixed(8);
+  }
+
+  await db
+    .update(transactions)
+    .set({
+      type: parsed.data.type,
+      amount: centsToDecimalString(cents, currency),
+      date: parsed.data.date,
+      categoryId: parsed.data.categoryId ?? null,
+      payee: parsed.data.payee ?? null,
+      notes: parsed.data.notes ?? null,
+      visibility: parsed.data.visibility,
+      fxRateToBase,
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, id));
+
+  revalidatePath("/transactions");
+  revalidatePath("/accounts");
+  return { ok: true };
+}
+
+export async function deleteTransaction(id: string): Promise<ActionResult> {
+  const { userId, householdId } = await requireMembership();
+  const existing = await db.query.transactions.findFirst({
+    where: and(
+      eq(transactions.id, id),
+      eq(transactions.householdId, householdId),
+      isNull(transactions.deletedAt),
+    ),
+  });
+  if (!existing) return { ok: false, error: "Transaction not found" };
+  const account = await usableAccount(householdId, userId, existing.accountId);
+  if (!account) return { ok: false, error: "Not your transaction to delete" };
+
+  const now = new Date();
+  await db
+    .update(transactions)
+    .set({ deletedAt: now, updatedAt: now })
+    .where(
+      existing.transferPeerId
+        ? or(eq(transactions.id, id), eq(transactions.id, existing.transferPeerId))
+        : eq(transactions.id, id),
+    );
+
+  revalidatePath("/transactions");
+  revalidatePath("/accounts");
+  return { ok: true };
+}
