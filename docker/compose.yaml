@@ -1,0 +1,54 @@
+# NOTE: because `app` shares the `tailscale` service's network namespace
+# (network_mode: service:tailscale), DATABASE_URL's host must be `postgres`
+# — resolvable because the `tailscale` service sits on the default compose
+# network alongside `postgres`.
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: money-maker
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale-serve.json:/config/serve.json:ro
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    network_mode: service:tailscale
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tailscale:
+        condition: service_started
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: ${AUTH_URL}
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-money}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-money_maker}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-money} -d ${POSTGRES_DB:-money_maker}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:
+  postgres-data:
