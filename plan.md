@@ -170,6 +170,28 @@ Real history lives in Revolut, Wise, Itaú (Paraguay), and Santander (Argentina)
 
 **Milestone: full multi-bank history in the app; reports reflect reality.**
 
+### Phase 1.6 — Dashboard & budgets (pulled forward from Phase 3, planned 2026-08-09)
+
+Decision: with real history imported, the dashboard and budgets deliver more value now than offline support — Phase 3's reporting core moves ahead of the PWA work.
+
+**Dashboard (`/` — replaces the stub):**
+
+- Month selector (default: current month), plus an "all time" option.
+- KPI row in base currency: income, expenses, net — with per-currency subtotals underneath and a "pending FX" marker when rates are missing (`summarizeTransactions` already computes all of this).
+- **Where it went:** expenses by category, sorted horizontal bars with amount + share; parent categories roll up their children, click-through to the filtered transactions list.
+- **Where it came from:** same treatment for income by category.
+- Trend: last 12 months, income vs expenses side by side (monthly bars, base currency).
+- Account balances snapshot (reuse `listAccountsWithBalances`).
+- Implementation: server-computed aggregates in `src/lib/queries.ts` (SQL GROUP BY, visibility rules and transfer-exclusion identical to `listTransactions`); charts are small hand-rolled inline SVG components — no chart dependency for v1.
+
+**Budgets (`/budgets`):** schema already exists (`budgets`: household + category + month + amount + currency, unique per (household, category, month)).
+
+- Month picker; per-category rows: budget input (base currency v1), actual spend that month (same aggregate as the dashboard), progress bar, over-budget highlight.
+- Actions: upsert/delete budget, "copy last month" rollover.
+- Personal-budget filtered view stays in Phase 3.
+
+Import-review follow-ups from first real use land here too (e.g. "needs review"/uncategorized filter in the transactions list).
+
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.
 - Quick-add screen; offline indicator; sync status/pending badge.
