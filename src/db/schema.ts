@@ -191,7 +191,11 @@ export const transactions = pgTable(
     fxRateToBase: numeric("fx_rate_to_base", { precision: 18, scale: 8 }),
     // Bank-import provenance (Phase 1.5): hash of account+date+amount+description.
     sourceHash: text("source_hash"),
-    importBatchId: uuid("import_batch_id"),
+    importBatchId: uuid("import_batch_id").references(() => importBatches.id),
+    // What the purchase was really made in when the account leg is a
+    // pre-converted amount (e.g. Wise card spend in GBP on a EUR account).
+    originalAmount: numeric("original_amount", { precision: 14, scale: 2 }),
+    originalCurrency: char("original_currency", { length: 3 }),
     ...syncColumns,
   },
   (t) => [
@@ -201,6 +205,66 @@ export const transactions = pgTable(
       .on(t.accountId, t.sourceHash)
       .where(sqlNotNull(t.sourceHash)),
   ],
+);
+
+// One committed import run (Phase 1.5). Not sync-tracked — server-side
+// provenance only; the transactions it created are what syncs. A batch may
+// span accounts (Santander PDFs yield ARS + USD rows from one file), so
+// account_id is the primary account or NULL for multi-account batches.
+export const importBatches = pgTable(
+  "import_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id").references(() => accounts.id),
+    // Parser id from the extraction pipeline (revolut, wise, itau_card, …).
+    source: text("source").notNull(),
+    filename: text("filename").notNull(),
+    fileSha256: text("file_sha256").notNull(),
+    dateFrom: date("date_from"),
+    dateTo: date("date_to"),
+    importedCount: bigint("imported_count", { mode: "number" })
+      .notNull()
+      .default(0),
+    skippedDuplicateCount: bigint("skipped_duplicate_count", { mode: "number" })
+      .notNull()
+      .default(0),
+    skippedFilteredCount: bigint("skipped_filtered_count", { mode: "number" })
+      .notNull()
+      .default(0),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("import_batches_household_idx").on(t.householdId, t.createdAt)],
+);
+
+// Auto-categorization rules, applied as *suggestions* at import preview time.
+// match_text is a case/accent-insensitive substring tested against
+// description/merchant; lower priority number wins ties.
+export const categoryRules = pgTable(
+  "category_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    matchText: text("match_text").notNull(),
+    // Optional narrowing filters; NULL = applies everywhere.
+    accountId: uuid("account_id").references(() => accounts.id),
+    currency: char("currency", { length: 3 }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id),
+    priority: bigint("priority", { mode: "number" }).notNull().default(0),
+    ...syncColumns,
+  },
+  (t) => [index("category_rules_household_idx").on(t.householdId, t.serverSeq)],
 );
 
 export const budgets = pgTable(

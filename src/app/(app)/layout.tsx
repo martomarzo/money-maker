@@ -47,6 +47,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/transactions" className="font-medium hover:underline">
           Transactions
         </Link>
+        <Link href="/settings/categories" className="font-medium hover:underline">
+          Categories
+        </Link>
+        <Link href="/import" className="font-medium hover:underline">
+          Import
+        </Link>
       </nav>
       <main className="flex flex-1 flex-col px-4 py-6">{children}</main>
     </div>

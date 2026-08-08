@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, categories, memberships, transactions, users } from "@/db/schema";
+import { accounts, categories, categoryRules, memberships, transactions, users } from "@/db/schema";
 import { decimalsFor, toCents } from "@/lib/domain/money";
 
 // Visibility rules (plan §3):
@@ -187,6 +187,21 @@ export async function listCategories(householdId: string) {
     where: and(eq(categories.householdId, householdId), isNull(categories.deletedAt)),
     orderBy: [categories.sortOrder, categories.name],
   });
+}
+
+export async function listCategoryRules(householdId: string) {
+  return db
+    .select({
+      rule: categoryRules,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+    })
+    .from(categoryRules)
+    .innerJoin(categories, eq(categoryRules.categoryId, categories.id))
+    .where(
+      and(eq(categoryRules.householdId, householdId), isNull(categoryRules.deletedAt)),
+    )
+    .orderBy(categoryRules.priority, categoryRules.matchText);
 }
 
 export async function listMembers(householdId: string) {

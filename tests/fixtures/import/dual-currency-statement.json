@@ -1,0 +1,102 @@
+{
+  "source": "fixture_bank_account",
+  "source_file": "Fixture/2026-01-statement.pdf",
+  "file_sha256": "fixture-sha256-0000000000000000000000000000000000000000000000000000000000",
+  "account_hint": {
+    "name": "Fixture cuenta (ARS+USD)",
+    "type": "checking",
+    "currency": null,
+    "note": "one app account per currency present in rows"
+  },
+  "meta": {
+    "opening_balance_ars": 100000,
+    "opening_date": "2026-01-01"
+  },
+  "validation": {
+    "balance_chain_checked": true,
+    "mismatches": 0
+  },
+  "warnings": [],
+  "rows": [
+    {
+      "date": "2026-01-05",
+      "description": "Compra con tarjeta de debito / Farmacia Ituraspe",
+      "amount_minor": -350000,
+      "currency": "ARS",
+      "kind": "purchase",
+      "merchant": null,
+      "original_amount_minor": null,
+      "original_currency": null,
+      "cardholder": null,
+      "place": null,
+      "source_id": "F1001",
+      "balance_minor": 99650000,
+      "extra": { "dedupe_key": "fixture-dedupe-ars-purchase-0001" },
+      "raw": "05/01/26 F1001 Compra con tarjeta de debito Farmacia Ituraspe -3.500,00 996.500,00"
+    },
+    {
+      "date": "2026-01-06",
+      "description": "Salary payment",
+      "amount_minor": 500000,
+      "currency": "ARS",
+      "kind": "income",
+      "merchant": null,
+      "original_amount_minor": null,
+      "original_currency": null,
+      "cardholder": null,
+      "place": null,
+      "source_id": "F1002",
+      "balance_minor": 104650000,
+      "extra": { "dedupe_key": "fixture-dedupe-ars-income-0002" },
+      "raw": "06/01/26 F1002 Salary payment 5.000,00 1.046.500,00"
+    },
+    {
+      "date": "2026-01-07",
+      "description": "Transferencia a Cuenta USD",
+      "amount_minor": -1000000,
+      "currency": "ARS",
+      "kind": "transfer",
+      "merchant": null,
+      "original_amount_minor": null,
+      "original_currency": null,
+      "cardholder": null,
+      "place": null,
+      "source_id": "F1003",
+      "balance_minor": 94650000,
+      "extra": { "dedupe_key": "fixture-dedupe-ars-transfer-0003" },
+      "raw": "07/01/26 F1003 Transferencia a Cuenta USD -10.000,00 946.500,00"
+    },
+    {
+      "date": "2026-01-08",
+      "description": "Transferencia recibida de Cuenta ARS",
+      "amount_minor": 1000,
+      "currency": "USD",
+      "kind": "transfer",
+      "merchant": null,
+      "original_amount_minor": null,
+      "original_currency": null,
+      "cardholder": null,
+      "place": null,
+      "source_id": "F1004",
+      "balance_minor": 1000,
+      "extra": { "dedupe_key": "fixture-dedupe-usd-transfer-0004" },
+      "raw": "08/01/26 F1004 Transferencia recibida de Cuenta ARS 10,00 10,00"
+    },
+    {
+      "date": "2026-01-09",
+      "description": "Impuesto sellos",
+      "amount_minor": -1200,
+      "currency": "ARS",
+      "kind": "tax",
+      "merchant": null,
+      "original_amount_minor": null,
+      "original_currency": null,
+      "cardholder": null,
+      "place": null,
+      "source_id": "F1005",
+      "balance_minor": 94648800,
+      "extra": { "dedupe_key": "fixture-dedupe-ars-tax-0005" },
+      "raw": "09/01/26 F1005 Impuesto sellos -12,00 946.488,00"
+    }
+  ]
+}

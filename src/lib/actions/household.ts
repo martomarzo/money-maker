@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { DEFAULT_CATEGORIES } from "@/db/default-categories";
-import { categories, households, invites, memberships } from "@/db/schema";
+import { DEFAULT_CATEGORY_RULES } from "@/db/default-category-rules";
+import { categories, categoryRules, households, invites, memberships } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
@@ -42,6 +43,7 @@ export async function createHousehold(
       role: "owner",
     });
 
+    const categoryIdByName = new Map<string, string>();
     for (const [i, parent] of DEFAULT_CATEGORIES.entries()) {
       const [parentRow] = await tx
         .insert(categories)
@@ -52,17 +54,34 @@ export async function createHousehold(
           sortOrder: i,
         })
         .returning();
+      categoryIdByName.set(parentRow.name, parentRow.id);
       if (parent.children?.length) {
-        await tx.insert(categories).values(
-          parent.children.map((child, j) => ({
-            householdId: household.id,
-            parentId: parentRow.id,
-            name: child.name,
-            icon: child.icon,
-            sortOrder: j,
-          })),
-        );
+        const childRows = await tx
+          .insert(categories)
+          .values(
+            parent.children.map((child, j) => ({
+              householdId: household.id,
+              parentId: parentRow.id,
+              name: child.name,
+              icon: child.icon,
+              sortOrder: j,
+            })),
+          )
+          .returning();
+        for (const childRow of childRows) {
+          categoryIdByName.set(childRow.name, childRow.id);
+        }
       }
+    }
+
+    const ruleRows = DEFAULT_CATEGORY_RULES.flatMap((rule) => {
+      const categoryId = categoryIdByName.get(rule.categoryName);
+      return categoryId
+        ? [{ householdId: household.id, matchText: rule.matchText, categoryId, priority: 100 }]
+        : [];
+    });
+    if (ruleRows.length > 0) {
+      await tx.insert(categoryRules).values(ruleRows);
     }
   });
 

@@ -142,12 +142,7 @@ Real history lives in Revolut, Wise, Itaú (Paraguay), and Santander (Argentina)
 | Santander Argentina — account | **PDF** (monthly "Mi resumen de cuenta") | `pdftotext -layout` extracts well. Two sections: `Movimientos en pesos` (ARS) and `Movimientos en dólares` (USD) → two app accounts from one PDF. `1.234,56` decimals, `dd/MM/yy` dates, `Comprobante` number, multi-line descriptions, running `Saldo` column (use to **validate** the parse). |
 | Santander Argentina — Visa | **PDF** (resumen de tarjeta) | Hardest: dual `$`/`U$S` columns (→ Visa ARS + Visa USD card accounts), `25 Julio 04` = yy/month-name/dd dates, tax lines (IIBB/IVA percepciones), payments with FX rate. Text extraction is noisy — build last, tolerate manual fallback. |
 
-**Architecture — `src/lib/import/`:**
-
-- **Parser adapters, one per source**, sharing a tiny contract: `detect(filename, content) → confidence` and `parse(content) → ParsedStatement { source, accountHints[], rows: NormalizedRow[] }`. Not column-map config — Itaú/Santander need real parsing code; declarative config only works for the CSVs.
-- `NormalizedRow`: `date`, `description`, `merchant?`, `amountMinor` (signed), `currency`, `kind` (purchase | payment | fee | exchange | transfer | tax | refund), `originalAmount?/originalCurrency?` (Wise card rows), `cardholder?` (Itaú adicional), `place?` (Itaú exterior/Paraguay), `sourceId?` (Wise ID, Santander comprobante, Itaú cupón), `raw` (verbatim line/cells for audit).
-- Parsing runs **server-side** (upload endpoint). PDFs: extract text with `pdf-parse`/pdfjs, then per-bank regex over layout text. Itaú: parse the HTML with a lightweight DOM (linkedom) — it is not XLS, never was; no SheetJS needed for v1 (no real XLSX source exists).
-- **Validation built in:** where the source has running balances (Revolut, Wise, Santander account), the parser re-computes and flags any gap — catches both parser bugs and truncated files.
+**Architecture — as built (2026-08-08):** per-bank parsing moved OUT of the app into the standalone Python pipeline `scripts/extract/` (stdlib + `pdftotext`, runs on the Windows machine without Node — see `scripts/extract/README.md`). It emits **normalized JSON** (`data/imports/extracted/*.json`, gitignored, synced via the Drive share) with signed integer minor units, `kind`, `extra.dedupe_key`, and per-parser arithmetic validation (balance chains / stated subtotals) built in. The app side (`src/lib/import/`) is a single **normalized-JSON adapter**: zod contract in `types.ts`, pure engine in `engine.ts` (kind→type mapping, in-batch dedupe, transfer-leg matching, accent-insensitive category-rule suggestions), fs loader in `load.ts`. TS re-parsers for in-app upload of raw bank files can come later; the original per-source adapter sketch below is superseded for v1.
 
 **Schema additions (migration 0002):**
 
@@ -171,7 +166,7 @@ Real history lives in Revolut, Wise, Itaú (Paraguay), and Santander (Argentina)
 
 **Historical FX backfill (new problem — history reaches back to 2024):** open.er-api.com free tier has no historical endpoint. Backfill strategy per currency: frankfurter.app (ECB) for EUR/USD history; BCRA's free API for official USD/ARS; BCP Paraguay publishes PYG reference rates. A one-time `scripts/backfill-fx.ts` populates `fx_rates` for the imported date range; anything still missing uses nearest-available rate and is marked approximate (`fx_rate_to_base` still set — reports work).
 
-**Build order:** Wise (richest, stable IDs) → Revolut → Itaú (HTML) → Santander account PDF → Santander Visa PDF. Golden-file unit tests per adapter using **synthetic fixtures** in `tests/fixtures/import/` that mirror the real layouts — real files stay out of git.
+**Build order:** done — extraction (Python, all five sources, validated) → migration 0002 → engine + tests (synthetic fixtures in `tests/fixtures/import/`; real files stay out of git) → `/import` UI → categories UI → `scripts/backfill-fx.ts` (frankfurter/ECB for EUR→USD, BCRA composed via USD for ARS, fxratesapi.com for PYG — BCP is Cloudflare-walled).
 
 **Milestone: full multi-bank history in the app; reports reflect reality.**
 
