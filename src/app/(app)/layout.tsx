@@ -47,6 +47,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/transactions" className="font-medium hover:underline">
           Transactions
         </Link>
+        <Link href="/wallet" className="font-medium hover:underline">
+          Wallet
+        </Link>
         <Link href="/settings/categories" className="font-medium hover:underline">
           Categories
         </Link>
