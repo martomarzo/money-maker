@@ -192,7 +192,7 @@ Decision: with real history imported, the dashboard and budgets deliver more val
 
 Import-review follow-ups from first real use land here too (e.g. "needs review"/uncategorized filter in the transactions list).
 
-### Phase 1.7 — Wallet capture (built 2026-08-19)
+### Phase 1.7 — Wallet capture (built & deployed 2026-08-19 — field-testing)
 
 Card payments auto-land in the app seconds after the tap. No native apps:
 Android forwards Google Wallet/bank notifications via a MacroDroid macro;
@@ -209,6 +209,8 @@ mappings. Migration 0003: `wallet_devices`, `wallet_card_mappings`,
 ingest; parse failures land in the inbox, never as wrong transactions).
 No reconciliation with statement imports — those were a one-time backfill.
 **Full spec: `docs/superpowers/specs/2026-08-19-wallet-capture-design.md`.** Setup guides at `docs/wallet-android-setup.md` / `docs/wallet-ios-setup.md`.
+
+Status: deployed live 2026-08-19 (endpoint verified: 401 unauthenticated, /wallet gated). User is field-testing with real taps; feedback drives the next iteration. Parked parser follow-ups for that pass: `\b` guards on alphabetic currency tokens (ARS/USD/Gs), zero-decimal fraction guard ("12.50" on a PYG card should hold, not book ₲1,250), widen minute regex if MacroDroid's `{minute}` proves unpadded, surface `{ok:false}` action errors in the inbox/devices UIs, dedupe repeated "always" rules.
 
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.
