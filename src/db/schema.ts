@@ -5,6 +5,7 @@ import {
   char,
   date,
   index,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -301,4 +302,80 @@ export const fxRates = pgTable(
       .defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.date, t.fromCurrency, t.toCurrency] })],
+);
+
+// ---------------------------------------------------------------------------
+// Wallet capture (Phase 1.7). Server-only plumbing — NOT sync-tracked; the
+// transactions a capture books are what sync. Raw payloads are kept forever
+// so failed parses can be retried/booked later from the inbox.
+// ---------------------------------------------------------------------------
+
+export const walletCaptureStatus = pgEnum("wallet_capture_status", [
+  "booked",
+  "needs_account",
+  "unparsed",
+  "dismissed",
+]);
+
+export const walletDevices = pgTable("wallet_devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  // sha256 hex of the bearer token; plaintext is shown once at creation.
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+});
+
+export const walletCardMappings = pgTable(
+  "wallet_card_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Normalized: last-4 digits (Android notifications) or lowercased card
+    // name (iOS Transaction trigger).
+    cardKey: text("card_key").notNull(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("wallet_card_mappings_user_key_idx").on(t.userId, t.cardKey),
+  ],
+);
+
+export const walletCaptures = pgTable(
+  "wallet_captures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    deviceId: uuid("device_id")
+      .notNull()
+      .references(() => walletDevices.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    // Full payload exactly as received — source of truth for (re)booking.
+    raw: jsonb("raw").notNull(),
+    // sha256(device_id | canonical payload) — makes ingest idempotent.
+    captureHash: text("capture_hash").notNull().unique(),
+    status: walletCaptureStatus("status").notNull(),
+    // Parsed fields, display-only (booking re-derives from `raw`).
+    amountMinor: bigint("amount_minor", { mode: "number" }),
+    currency: char("currency", { length: 3 }),
+    merchant: text("merchant"),
+    cardKey: text("card_key"),
+    transactionId: uuid("transaction_id").references(() => transactions.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("wallet_captures_device_idx").on(t.deviceId, t.createdAt)],
 );
