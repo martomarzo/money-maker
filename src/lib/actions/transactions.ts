@@ -5,9 +5,10 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { accounts, households, transactions } from "@/db/schema";
+import { households, transactions } from "@/db/schema";
 import { centsToDecimalString, toCents } from "@/lib/domain/money";
 import { getRate } from "@/lib/fx";
+import { usablePostingAccount } from "@/lib/queries";
 import { requireMembership } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
@@ -32,19 +33,6 @@ const transferSchema = z.object({
   date: isoDate,
   notes: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
 });
-
-/** Account usable for posting by this user: in household, not deleted, and
- *  either joint or owned by them. */
-async function usableAccount(householdId: string, userId: string, accountId: string) {
-  return db.query.accounts.findFirst({
-    where: and(
-      eq(accounts.id, accountId),
-      eq(accounts.householdId, householdId),
-      isNull(accounts.deletedAt),
-      or(isNull(accounts.ownerUserId), eq(accounts.ownerUserId, userId)),
-    ),
-  });
-}
 
 function parsePositiveAmount(raw: string, currency: string): number | null {
   try {
@@ -72,7 +60,7 @@ export async function createTransaction(
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
-  const account = await usableAccount(householdId, userId, parsed.data.accountId);
+  const account = await usablePostingAccount(householdId, userId, parsed.data.accountId);
   if (!account) return { ok: false, error: "Account not found or not yours" };
   const currency = account.currency.trim();
 
@@ -128,8 +116,8 @@ export async function createTransfer(
   }
 
   const [from, to] = await Promise.all([
-    usableAccount(householdId, userId, parsed.data.fromAccountId),
-    usableAccount(householdId, userId, parsed.data.toAccountId),
+    usablePostingAccount(householdId, userId, parsed.data.fromAccountId),
+    usablePostingAccount(householdId, userId, parsed.data.toAccountId),
   ]);
   if (!from || !to) return { ok: false, error: "Account not found or not yours" };
   const fromCurrency = from.currency.trim();
@@ -209,7 +197,7 @@ export async function updateTransaction(
   if (existing.type === "transfer") {
     return { ok: false, error: "Delete and recreate transfers to change them" };
   }
-  const account = await usableAccount(householdId, userId, existing.accountId);
+  const account = await usablePostingAccount(householdId, userId, existing.accountId);
   if (!account) return { ok: false, error: "Not your transaction to edit" };
 
   const parsed = entrySchema.safeParse({
@@ -268,7 +256,7 @@ export async function deleteTransaction(id: string): Promise<ActionResult> {
     ),
   });
   if (!existing) return { ok: false, error: "Transaction not found" };
-  const account = await usableAccount(householdId, userId, existing.accountId);
+  const account = await usablePostingAccount(householdId, userId, existing.accountId);
   if (!account) return { ok: false, error: "Not your transaction to delete" };
 
   const now = new Date();

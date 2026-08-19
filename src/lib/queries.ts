@@ -204,6 +204,24 @@ export async function listCategoryRules(householdId: string) {
     .orderBy(categoryRules.priority, categoryRules.matchText);
 }
 
+/** Account usable for posting by this user: in household, not deleted, and
+ *  either joint or owned by them. (Shared by transaction actions, wallet
+ *  ingest, and wallet server actions.) */
+export async function usablePostingAccount(
+  householdId: string,
+  userId: string,
+  accountId: string,
+) {
+  return db.query.accounts.findFirst({
+    where: and(
+      eq(accounts.id, accountId),
+      eq(accounts.householdId, householdId),
+      isNull(accounts.deletedAt),
+      or(isNull(accounts.ownerUserId), eq(accounts.ownerUserId, userId)),
+    ),
+  });
+}
+
 export async function listMembers(householdId: string) {
   return db
     .select({ id: users.id, displayName: users.displayName })
