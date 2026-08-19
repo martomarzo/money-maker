@@ -192,6 +192,24 @@ Decision: with real history imported, the dashboard and budgets deliver more val
 
 Import-review follow-ups from first real use land here too (e.g. "needs review"/uncategorized filter in the transactions list).
 
+### Phase 1.7 — Wallet capture (added 2026-08-19, being built next — ahead of 1.6)
+
+Card payments auto-land in the app seconds after the tap. No native apps:
+Android forwards Google Wallet/bank notifications via a MacroDroid macro;
+iPhone uses the built-in Shortcuts "Transaction" automation (iOS 17+). Both
+POST over the tailnet to `POST /api/wallet/capture` (per-device bearer
+tokens). Server pipeline (`src/lib/wallet/`): parse → card→account mapping
+(`card_key` = last-4 on Android, card name on iOS) → `category_rules`
+auto-categorization (reuses `suggestCategory`) → insert expense
+(personal-default, cross-currency via `original_amount/original_currency` +
+`fx_rates`). `/wallet` inbox: one-tap share, recategorize (+create rule),
+assign unknown cards, dismiss noise; `/settings/devices` manages tokens and
+mappings. Migration 0003: `wallet_devices`, `wallet_card_mappings`,
+`wallet_captures` (raw payload kept; `capture_hash` unique = idempotent
+ingest; parse failures land in the inbox, never as wrong transactions).
+No reconciliation with statement imports — those were a one-time backfill.
+**Full spec: `docs/superpowers/specs/2026-08-19-wallet-capture-design.md`.**
+
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.
 - Quick-add screen; offline indicator; sync status/pending badge.
