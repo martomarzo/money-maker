@@ -5,9 +5,19 @@
 
 import { z } from "zod";
 
+/** Zero-pads "2026-8-9T4:05:00" → "2026-08-09T04:05:00" so downstream
+ *  date slicing and hashing see one canonical form. */
+export function normalizeIsoDateTime(s: string): string {
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})T(\d{1,2}):(\d{2})(.*)$/.exec(s.trim());
+  if (!m) return s;
+  const [, y, mo, d, h, min, rest] = m;
+  return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${min}${rest}`;
+}
+
 const isoDateTime = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, "expected ISO-8601 datetime");
+  .regex(/^\d{4}-\d{1,2}-\d{1,2}T\d{1,2}:\d{2}/, "expected ISO-8601 datetime")
+  .transform(normalizeIsoDateTime);
 
 export const androidCaptureSchema = z.object({
   kind: z.literal("android_notification"),

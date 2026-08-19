@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   amountToMinor,
   captureHash,
+  captureHashRaw,
   normalizeCardKey,
 } from "@/lib/wallet/engine";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/wallet/tokens";
-import { capturePayloadSchema, type CapturePayload } from "@/lib/wallet/types";
+import {
+  capturePayloadSchema,
+  normalizeIsoDateTime,
+  type CapturePayload,
+} from "@/lib/wallet/types";
 
 const androidPayload: CapturePayload = {
   kind: "android_notification",
@@ -36,6 +41,28 @@ describe("capturePayloadSchema", () => {
         .success,
     ).toBe(false);
   });
+
+  it("accepts unpadded date/hour tokens and normalizes postedAt", () => {
+    const parsed = capturePayloadSchema.parse({
+      ...androidPayload,
+      postedAt: "2026-8-9T4:05:00",
+    });
+    expect(parsed.postedAt).toBe("2026-08-09T04:05:00");
+  });
+});
+
+describe("normalizeIsoDateTime", () => {
+  it("zero-pads unpadded month/day/hour", () => {
+    expect(normalizeIsoDateTime("2026-8-9T4:05:00")).toBe("2026-08-09T04:05:00");
+  });
+
+  it("leaves an already-padded datetime unchanged", () => {
+    expect(normalizeIsoDateTime("2026-08-19T12:34:56Z")).toBe("2026-08-19T12:34:56Z");
+  });
+
+  it("returns non-matching input unchanged", () => {
+    expect(normalizeIsoDateTime("not a date")).toBe("not a date");
+  });
 });
 
 describe("captureHash", () => {
@@ -52,6 +79,27 @@ describe("captureHash", () => {
     expect(
       captureHash("dev-1", { ...androidPayload, postedAt: "2026-08-19T12:35:00Z" }),
     ).not.toBe(captureHash("dev-1", androidPayload));
+  });
+});
+
+describe("captureHashRaw", () => {
+  it("is stable for the same device + body text", () => {
+    expect(captureHashRaw("dev-1", "some raw body")).toBe(
+      captureHashRaw("dev-1", "some raw body"),
+    );
+  });
+
+  it("differs across devices and across bodies", () => {
+    expect(captureHashRaw("dev-2", "some raw body")).not.toBe(
+      captureHashRaw("dev-1", "some raw body"),
+    );
+    expect(captureHashRaw("dev-1", "other body")).not.toBe(
+      captureHashRaw("dev-1", "some raw body"),
+    );
+  });
+
+  it("returns a 64-char hex digest", () => {
+    expect(captureHashRaw("dev-1", "some raw body")).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

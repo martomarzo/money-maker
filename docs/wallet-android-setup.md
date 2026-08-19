@@ -19,7 +19,7 @@ token from https://money-maker.peacock-snapper.ts.net/settings/devices.
        exact token names in your MacroDroid version may differ slightly;
        pick "Notification title", "Notification text", "App package"):
 
-       {"kind":"android_notification","app":"{not_app_package}","title":"{not_title}","text":"{notification}","postedAt":"{year}-{month_digit}-{dayofmonth}T{hour_0}:{minute}:00"}
+       {"kind":"android_notification","app":"{not_app_package}","title":"{not_title}","text":"{notification}","postedAt":"{year}-{month_digit}-{dayofmonth}T{hour_0}:{minute}:{second}"}
 
    - **Constraints:** none needed.
 3. Tap a card payment. Within seconds the purchase appears in

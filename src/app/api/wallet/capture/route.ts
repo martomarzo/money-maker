@@ -18,6 +18,7 @@ import { bookCapture } from "@/lib/wallet/book";
 import {
   amountToMinor,
   captureHash,
+  captureHashRaw,
   normalizeCardKey,
   parseCapture,
 } from "@/lib/wallet/engine";
@@ -26,23 +27,32 @@ import { capturePayloadSchema, type CapturePayload } from "@/lib/wallet/types";
 
 /** Body → payload. Falls back to wrapping the raw text as an unstructured
  *  android payload when JSON parsing fails (MacroDroid can't JSON-escape
- *  notification text) — a capture is never lost to a quoting bug. */
-async function readPayload(req: Request): Promise<CapturePayload | null> {
+ *  notification text) — a capture is never lost to a quoting bug.
+ *  `rawFallbackText` is set only when the fallback path was taken, so the
+ *  caller can hash from the original body text instead of the wrapper
+ *  (which is stamped with the current time and would otherwise break
+ *  idempotency on retry). */
+async function readPayload(
+  req: Request,
+): Promise<{ payload: CapturePayload; rawFallbackText: string | null } | null> {
   const bodyText = await req.text();
   try {
     const parsed = capturePayloadSchema.safeParse(JSON.parse(bodyText));
-    if (parsed.success) return parsed.data;
+    if (parsed.success) return { payload: parsed.data, rawFallbackText: null };
   } catch {
     // fall through to the raw wrapper
   }
   const trimmed = bodyText.trim();
   if (!trimmed) return null;
   return {
-    kind: "android_notification",
-    app: "unknown",
-    title: "",
-    text: trimmed.slice(0, 4000),
-    postedAt: new Date().toISOString(),
+    payload: {
+      kind: "android_notification",
+      app: "unknown",
+      title: "",
+      text: trimmed.slice(0, 4000),
+      postedAt: new Date().toISOString(),
+    },
+    rawFallbackText: bodyText,
   };
 }
 
@@ -59,8 +69,9 @@ export async function POST(req: Request) {
   });
   if (!device) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-  const payload = await readPayload(req);
-  if (!payload) return Response.json({ error: "empty body" }, { status: 400 });
+  const read = await readPayload(req);
+  if (!read) return Response.json({ error: "empty body" }, { status: 400 });
+  const { payload, rawFallbackText } = read;
 
   const membership = await db.query.memberships.findFirst({
     where: eq(memberships.userId, device.userId),
@@ -104,7 +115,10 @@ export async function POST(req: Request) {
       deviceId: device.id,
       kind: payload.kind,
       raw: payload,
-      captureHash: captureHash(device.id, payload),
+      captureHash:
+        rawFallbackText !== null
+          ? captureHashRaw(device.id, rawFallbackText)
+          : captureHash(device.id, payload),
       status: parsed ? "needs_account" : "unparsed",
       amountMinor,
       currency: parsed?.currency ?? null,

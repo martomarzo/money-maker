@@ -19,6 +19,12 @@ export function captureHash(deviceId: string, payload: CapturePayload): string {
   return createHash("sha256").update(`${deviceId}|${canonical}`).digest("hex");
 }
 
+/** Idempotency hash for bodies that failed JSON/schema parsing — derived
+ *  from the raw text so a client retry of the same body is a no-op. */
+export function captureHashRaw(deviceId: string, bodyText: string): string {
+  return createHash("sha256").update(`${deviceId}|raw|${bodyText}`).digest("hex");
+}
+
 /** Card keys are matched case-insensitively ("Revolut" ≡ "revolut"). */
 export function normalizeCardKey(raw: string): string {
   return raw.trim().toLowerCase();
