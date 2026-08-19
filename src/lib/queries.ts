@@ -1,6 +1,16 @@
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, categories, categoryRules, memberships, transactions, users } from "@/db/schema";
+import {
+  accounts,
+  categories,
+  categoryRules,
+  memberships,
+  transactions,
+  users,
+  walletCaptures,
+  walletCardMappings,
+  walletDevices,
+} from "@/db/schema";
 import { decimalsFor, toCents } from "@/lib/domain/money";
 
 // Visibility rules (plan §3):
@@ -220,6 +230,56 @@ export async function usablePostingAccount(
       or(isNull(accounts.ownerUserId), eq(accounts.ownerUserId, userId)),
     ),
   });
+}
+
+export async function listWalletDevices(userId: string) {
+  return db.query.walletDevices.findMany({
+    where: eq(walletDevices.userId, userId),
+    orderBy: desc(walletDevices.createdAt),
+  });
+}
+
+export async function listWalletCardMappings(userId: string) {
+  return db
+    .select({
+      id: walletCardMappings.id,
+      cardKey: walletCardMappings.cardKey,
+      accountId: walletCardMappings.accountId,
+      accountName: accounts.name,
+    })
+    .from(walletCardMappings)
+    .innerJoin(accounts, eq(walletCardMappings.accountId, accounts.id))
+    .where(eq(walletCardMappings.userId, userId))
+    .orderBy(walletCardMappings.cardKey);
+}
+
+/** Recent captures for the current user's devices, newest first, with the
+ *  linked transaction's current state for inbox display. */
+export async function listWalletCaptures(userId: string, limit = 50) {
+  return db
+    .select({
+      id: walletCaptures.id,
+      status: walletCaptures.status,
+      kind: walletCaptures.kind,
+      raw: walletCaptures.raw,
+      amountMinor: walletCaptures.amountMinor,
+      currency: walletCaptures.currency,
+      merchant: walletCaptures.merchant,
+      cardKey: walletCaptures.cardKey,
+      createdAt: walletCaptures.createdAt,
+      transactionId: walletCaptures.transactionId,
+      deviceName: walletDevices.name,
+      txnVisibility: transactions.visibility,
+      txnCategoryId: transactions.categoryId,
+      txnAmount: transactions.amount,
+      txnCurrency: transactions.currency,
+    })
+    .from(walletCaptures)
+    .innerJoin(walletDevices, eq(walletCaptures.deviceId, walletDevices.id))
+    .leftJoin(transactions, eq(walletCaptures.transactionId, transactions.id))
+    .where(eq(walletDevices.userId, userId))
+    .orderBy(desc(walletCaptures.createdAt))
+    .limit(limit);
 }
 
 export async function listMembers(householdId: string) {
