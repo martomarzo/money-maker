@@ -1,8 +1,8 @@
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { listAccountsWithBalances } from "@/lib/queries";
 import { formatCents } from "@/lib/domain/money";
 import { setAccountArchived } from "@/lib/actions/accounts";
-import { Badge, Button, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Button, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import Link from "next/link";
 
 type AccountWithBalance = Awaited<ReturnType<typeof listAccountsWithBalances>>[number];
@@ -15,8 +15,8 @@ const TYPE_LABELS: Record<AccountWithBalance["type"], string> = {
 };
 
 export default async function AccountsPage() {
-  const { userId, householdId } = await requireMembership();
-  const accounts = await listAccountsWithBalances(householdId, userId);
+  const userId = await requireUserId();
+  const accounts = await listAccountsWithBalances(userId);
 
   const active = accounts.filter((a) => !a.archived);
   const archived = accounts.filter((a) => a.archived);
@@ -80,7 +80,6 @@ function AccountCard({ account }: { account: AccountWithBalance }) {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="font-medium">{account.name}</span>
-            <Badge>{account.ownerUserId ? "Personal" : "Joint"}</Badge>
           </div>
           <span className="text-xs text-muted">
             {TYPE_LABELS[account.type]} · {account.currency}

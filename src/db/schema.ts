@@ -39,7 +39,6 @@ export const transactionType = pgEnum("transaction_type", [
   "income",
   "transfer",
 ]);
-export const visibility = pgEnum("visibility", ["shared", "personal"]);
 
 // ---------------------------------------------------------------------------
 // Sync bookkeeping
@@ -72,6 +71,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
+  // Base currency of the user's personal ledger (reports convert to it).
+  baseCurrency: char("base_currency", { length: 3 }).notNull().default("EUR"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -127,11 +128,9 @@ export const accounts = pgTable(
   "accounts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    householdId: uuid("household_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
-    // NULL = joint/shared account visible to all members
-    ownerUserId: uuid("owner_user_id").references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     type: accountType("type").notNull(),
     currency: char("currency", { length: 3 }).notNull(),
@@ -142,16 +141,16 @@ export const accounts = pgTable(
     archived: boolean("archived").notNull().default(false),
     ...syncColumns,
   },
-  (t) => [index("accounts_household_idx").on(t.householdId, t.serverSeq)],
+  (t) => [index("accounts_user_idx").on(t.userId, t.serverSeq)],
 );
 
 export const categories = pgTable(
   "categories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    householdId: uuid("household_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     parentId: uuid("parent_id"),
     name: text("name").notNull(),
     icon: text("icon"),
@@ -159,7 +158,7 @@ export const categories = pgTable(
     sortOrder: bigint("sort_order", { mode: "number" }).notNull().default(0),
     ...syncColumns,
   },
-  (t) => [index("categories_household_idx").on(t.householdId, t.serverSeq)],
+  (t) => [index("categories_user_idx").on(t.userId, t.serverSeq)],
 );
 
 export const transactions = pgTable(
@@ -167,9 +166,11 @@ export const transactions = pgTable(
   {
     // Client-generated UUID — enables idempotent offline sync.
     id: uuid("id").primaryKey(),
-    householdId: uuid("household_id")
+    // Owner of the personal ledger this row lives in. Never visible to other
+    // users unless a transaction_shares row exists.
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id),
@@ -185,7 +186,6 @@ export const transactions = pgTable(
     categoryId: uuid("category_id").references(() => categories.id),
     payee: text("payee"),
     notes: text("notes"),
-    visibility: visibility("visibility").notNull().default("shared"),
     // Links the two legs of a transfer.
     transferPeerId: uuid("transfer_peer_id"),
     // Rate snapshotted for the transaction date; NULL until backfilled.
@@ -200,7 +200,7 @@ export const transactions = pgTable(
     ...syncColumns,
   },
   (t) => [
-    index("transactions_household_seq_idx").on(t.householdId, t.serverSeq),
+    index("transactions_user_seq_idx").on(t.userId, t.serverSeq),
     index("transactions_account_date_idx").on(t.accountId, t.date),
     uniqueIndex("transactions_source_hash_idx")
       .on(t.accountId, t.sourceHash)
@@ -216,9 +216,9 @@ export const importBatches = pgTable(
   "import_batches",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    householdId: uuid("household_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     accountId: uuid("account_id").references(() => accounts.id),
     // Parser id from the extraction pipeline (revolut, wise, itau_card, …).
     source: text("source").notNull(),
@@ -242,7 +242,7 @@ export const importBatches = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("import_batches_household_idx").on(t.householdId, t.createdAt)],
+  (t) => [index("import_batches_user_idx").on(t.userId, t.createdAt)],
 );
 
 // Auto-categorization rules, applied as *suggestions* at import preview time.
@@ -252,9 +252,9 @@ export const categoryRules = pgTable(
   "category_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    householdId: uuid("household_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     matchText: text("match_text").notNull(),
     // Optional narrowing filters; NULL = applies everywhere.
     accountId: uuid("account_id").references(() => accounts.id),
@@ -265,16 +265,16 @@ export const categoryRules = pgTable(
     priority: bigint("priority", { mode: "number" }).notNull().default(0),
     ...syncColumns,
   },
-  (t) => [index("category_rules_household_idx").on(t.householdId, t.serverSeq)],
+  (t) => [index("category_rules_user_idx").on(t.userId, t.serverSeq)],
 );
 
 export const budgets = pgTable(
   "budgets",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    householdId: uuid("household_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => households.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id),
@@ -285,9 +285,51 @@ export const budgets = pgTable(
     ...syncColumns,
   },
   (t) => [
-    uniqueIndex("budgets_unique_idx").on(t.householdId, t.categoryId, t.month),
-    index("budgets_household_idx").on(t.householdId, t.serverSeq),
+    uniqueIndex("budgets_unique_idx").on(t.userId, t.categoryId, t.month),
+    index("budgets_user_idx").on(t.userId, t.serverSeq),
   ],
+);
+
+// ---------------------------------------------------------------------------
+// Household sharing (Phase 1.9). A transaction stays in its owner's personal
+// ledger; a share row makes it visible to exactly one household, with the
+// full amount split among the members present at share time (even by
+// default, owner-editable). Splits are in the transaction's currency.
+// ---------------------------------------------------------------------------
+
+export const transactionShares = pgTable(
+  "transaction_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => transactions.id, { onDelete: "cascade" }),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    sharedByUserId: uuid("shared_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    ...syncColumns,
+  },
+  (t) => [
+    uniqueIndex("transaction_shares_transaction_idx").on(t.transactionId),
+    index("transaction_shares_household_idx").on(t.householdId, t.serverSeq),
+  ],
+);
+
+export const transactionShareSplits = pgTable(
+  "transaction_share_splits",
+  {
+    shareId: uuid("share_id")
+      .notNull()
+      .references(() => transactionShares.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    shareCents: bigint("share_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.shareId, t.userId] })],
 );
 
 export const fxRates = pgTable(

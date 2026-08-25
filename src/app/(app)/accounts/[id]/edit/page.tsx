@@ -1,8 +1,8 @@
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { AccountForm } from "@/components/account-form";
 import { ButtonLink, PageHeader } from "@/components/ui";
 
@@ -11,15 +11,11 @@ export default async function EditAccountPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const { id } = await params;
 
   const account = await db.query.accounts.findFirst({
-    where: and(
-      eq(accounts.id, id),
-      eq(accounts.householdId, householdId),
-      or(isNull(accounts.ownerUserId), eq(accounts.ownerUserId, userId)),
-    ),
+    where: and(eq(accounts.id, id), eq(accounts.userId, userId), isNull(accounts.deletedAt)),
   });
   if (!account) notFound();
 
@@ -38,7 +34,6 @@ export default async function EditAccountPage({
             currency: account.currency.trim(),
             country: account.country,
             initialBalance: account.initialBalance,
-            ownerUserId: account.ownerUserId,
             archived: account.archived,
           }}
         />

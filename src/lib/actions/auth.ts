@@ -6,6 +6,7 @@ import { z } from "zod";
 import { signIn } from "@/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { seedPersonalLedger } from "@/db/seed-personal";
 
 const registerSchema = z.object({
   email: z.email("Enter a valid email"),
@@ -37,16 +38,18 @@ export async function register(
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-  await db.insert(users).values({
-    email,
-    passwordHash,
-    displayName: parsed.data.displayName,
+  await db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(users)
+      .values({ email, passwordHash, displayName: parsed.data.displayName })
+      .returning({ id: users.id });
+    await seedPersonalLedger(tx, user.id);
   });
 
   await signIn("credentials", {
     email,
     password: parsed.data.password,
-    redirectTo: "/onboarding",
+    redirectTo: "/",
   });
   return { ok: true };
 }

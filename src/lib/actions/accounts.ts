@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
 import { centsToDecimalString, toCents } from "@/lib/domain/money";
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
 const accountSchema = z.object({
@@ -20,7 +20,6 @@ const accountSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   initialBalance: z.string().default("0"),
-  personal: z.coerce.boolean().default(false),
 });
 
 function parseAccountForm(formData: FormData) {
@@ -30,7 +29,6 @@ function parseAccountForm(formData: FormData) {
     currency: formData.get("currency"),
     country: formData.get("country") ?? undefined,
     initialBalance: formData.get("initialBalance") || "0",
-    personal: formData.get("personal") === "on" || formData.get("personal") === "true",
   });
 }
 
@@ -38,7 +36,7 @@ export async function createAccount(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const parsed = parseAccountForm(formData);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
@@ -53,8 +51,7 @@ export async function createAccount(
   }
 
   await db.insert(accounts).values({
-    householdId,
-    ownerUserId: parsed.data.personal ? userId : null,
+    userId,
     name: parsed.data.name,
     type: parsed.data.type,
     currency: parsed.data.currency,
@@ -70,18 +67,15 @@ export async function updateAccount(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = parseAccountForm(formData);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   const existing = await db.query.accounts.findFirst({
-    where: and(eq(accounts.id, id), eq(accounts.householdId, householdId)),
+    where: and(eq(accounts.id, id), eq(accounts.userId, userId)),
   });
   if (!existing) return { ok: false, error: "Account not found" };
-  if (existing.ownerUserId && existing.ownerUserId !== userId) {
-    return { ok: false, error: "You can only edit your own accounts" };
-  }
 
   let initialBalance: string;
   try {
@@ -101,7 +95,6 @@ export async function updateAccount(
       type: parsed.data.type,
       country: parsed.data.country,
       initialBalance,
-      ownerUserId: parsed.data.personal ? (existing.ownerUserId ?? userId) : null,
       updatedAt: new Date(),
     })
     .where(eq(accounts.id, id));
@@ -114,14 +107,11 @@ export async function setAccountArchived(
   id: string,
   archived: boolean,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const existing = await db.query.accounts.findFirst({
-    where: and(eq(accounts.id, id), eq(accounts.householdId, householdId)),
+    where: and(eq(accounts.id, id), eq(accounts.userId, userId)),
   });
   if (!existing) return { ok: false, error: "Account not found" };
-  if (existing.ownerUserId && existing.ownerUserId !== userId) {
-    return { ok: false, error: "You can only archive your own accounts" };
-  }
 
   await db
     .update(accounts)

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createInvite } from "@/lib/actions/household";
 import { Button, ErrorText } from "@/components/ui";
 
-export function InvitePartner() {
+export function InvitePartner({ householdId }: { householdId: string }) {
   const [isPending, startTransition] = useTransition();
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -15,7 +15,7 @@ export function InvitePartner() {
     setCopied(false);
     startTransition(async () => {
       try {
-        const { code } = await createInvite();
+        const { code } = await createInvite(householdId);
         setJoinUrl(`${window.location.origin}/join/${code}`);
       } catch {
         setError("Could not create an invite. Try again.");
@@ -32,7 +32,7 @@ export function InvitePartner() {
   return (
     <div className="flex flex-col gap-3">
       <Button type="button" onClick={handleInvite} disabled={isPending} className="self-start">
-        {isPending ? "Creating invite..." : "Invite partner"}
+        {isPending ? "Creating invite..." : "Create invite link"}
       </Button>
 
       {error && <ErrorText>{error}</ErrorText>}

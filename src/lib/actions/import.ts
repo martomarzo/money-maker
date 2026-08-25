@@ -12,13 +12,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import {
-  accounts,
-  categories,
-  households,
-  importBatches,
-  transactions,
-} from "@/db/schema";
+import { accounts, categories, importBatches, transactions } from "@/db/schema";
 import { centsToDecimalString, toCents } from "@/lib/domain/money";
 import { getRate } from "@/lib/fx";
 import {
@@ -33,7 +27,7 @@ import {
 import { listExtractedFiles, loadExtractedStatement } from "@/lib/import/load";
 import type { AccountHint } from "@/lib/import/types";
 import { listCategories, listCategoryRules } from "@/lib/queries";
-import { requireMembership } from "@/lib/session";
+import { requireUser, requireUserId } from "@/lib/session";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -90,7 +84,7 @@ export interface StatementSummary {
  *  partial unique index on source_hash makes re-commits idempotent, and we
  *  only look at the most recent batch here). */
 export async function listStatementSummaries(): Promise<StatementSummary[]> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const files = await listExtractedFiles();
 
   const statements = await Promise.all(
@@ -103,10 +97,7 @@ export async function listStatementSummaries(): Promise<StatementSummary[]> {
   const shas = [...new Set(statements.map(({ stmt }) => stmt.file_sha256))];
   const batches = shas.length
     ? await db.query.importBatches.findMany({
-        where: and(
-          eq(importBatches.householdId, householdId),
-          inArray(importBatches.fileSha256, shas),
-        ),
+        where: and(eq(importBatches.userId, userId), inArray(importBatches.fileSha256, shas)),
         orderBy: [desc(importBatches.createdAt)],
       })
     : [];
@@ -172,9 +163,9 @@ export interface RecentImportBatch {
 /** Most recent committed batches for the household, for the /import page's
  *  history list (with Undo buttons). */
 export async function listRecentImportBatches(limit = 20): Promise<RecentImportBatch[]> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const rows = await db.query.importBatches.findMany({
-    where: eq(importBatches.householdId, householdId),
+    where: eq(importBatches.userId, userId),
     orderBy: [desc(importBatches.createdAt)],
     limit,
   });
@@ -243,7 +234,7 @@ export interface StatementPreview {
  *  suggestions. Returns null when the filename doesn't match a real
  *  extracted file. */
 export async function previewStatement(filename: string): Promise<StatementPreview | null> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
 
   const filePath = await resolveStatementPath(filename);
   if (!filePath) return null;
@@ -252,14 +243,14 @@ export async function previewStatement(filename: string): Promise<StatementPrevi
   const { drafts, currencies } = draftsFromStatement(stmt);
   const multiCurrency = currencies.length > 1;
 
-  const [allHouseholdAccounts, ruleRows, categoryRows] = await Promise.all([
+  const [allUserAccounts, ruleRows, categoryRows] = await Promise.all([
     db.query.accounts.findMany({
-      where: and(eq(accounts.householdId, householdId), isNull(accounts.deletedAt)),
+      where: and(eq(accounts.userId, userId), isNull(accounts.deletedAt)),
     }),
-    listCategoryRules(householdId),
-    listCategories(householdId),
+    listCategoryRules(userId),
+    listCategories(userId),
   ]);
-  const householdAccounts = allHouseholdAccounts.filter((a) => !a.archived);
+  const householdAccounts = allUserAccounts.filter((a) => !a.archived);
   const rules: CategoryRule[] = ruleRows.map((r) => r.rule);
 
   const matchTokens = [
@@ -458,7 +449,7 @@ export async function commitStatement(
   _prev: CommitStatementResult | null,
   formData: FormData,
 ): Promise<CommitStatementResult> {
-  const { userId, householdId } = await requireMembership();
+  const { userId, baseCurrency } = await requireUser();
 
   const parsed = commitSchema.safeParse({
     filename: formData.get("filename"),
@@ -481,14 +472,14 @@ export async function commitStatement(
     }
   }
 
-  // Validate "existing account" choices belong to the household and match currency.
+  // Validate "existing account" choices belong to the user and match currency.
   for (const currency of currencies) {
     const choice = accountChoices[currency];
     if (choice.mode !== "existing") continue;
     const account = await db.query.accounts.findFirst({
       where: and(
         eq(accounts.id, choice.accountId),
-        eq(accounts.householdId, householdId),
+        eq(accounts.userId, userId),
         isNull(accounts.deletedAt),
       ),
     });
@@ -498,7 +489,7 @@ export async function commitStatement(
     }
   }
 
-  // Validate category overrides belong to the household.
+  // Validate category overrides belong to the user.
   const overrideCategoryIds = [
     ...new Set(Object.values(categoryOverrides).filter((v): v is string => Boolean(v))),
   ];
@@ -506,7 +497,7 @@ export async function commitStatement(
     const validCategories = await db.query.categories.findMany({
       where: and(
         inArray(categories.id, overrideCategoryIds),
-        eq(categories.householdId, householdId),
+        eq(categories.userId, userId),
         isNull(categories.deletedAt),
       ),
     });
@@ -521,13 +512,7 @@ export async function commitStatement(
     return { ok: false, error: "No rows selected to import" };
   }
 
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  if (!household) return { ok: false, error: "Household not found" };
-  const baseCurrency = household.baseCurrency.trim();
-
-  const ruleRows = await listCategoryRules(householdId);
+  const ruleRows = await listCategoryRules(userId);
   const rules: CategoryRule[] = ruleRows.map((r) => r.rule);
 
   // FX lookups repeat heavily across a statement (many rows share a date) —
@@ -559,8 +544,7 @@ export async function commitStatement(
       const [created] = await tx
         .insert(accounts)
         .values({
-          householdId,
-          ownerUserId: null,
+          userId,
           name: choice.name,
           type: choice.type,
           currency,
@@ -574,7 +558,7 @@ export async function commitStatement(
     const [batch] = await tx
       .insert(importBatches)
       .values({
-        householdId,
+        userId,
         accountId: currencies.length === 1 ? (accountIdByCurrency.get(currencies[0]) ?? null) : null,
         source: stmt.source,
         filename,
@@ -608,7 +592,7 @@ export async function commitStatement(
 
       insertValues.push({
         id,
-        householdId,
+        userId,
         accountId,
         createdByUserId: userId,
         type: draft.type,
@@ -618,7 +602,6 @@ export async function commitStatement(
         categoryId,
         payee: draft.payee.length > 0 ? draft.payee : null,
         notes: draft.notes,
-        visibility: "shared" as const,
         fxRateToBase: rate == null ? null : rate.toFixed(8),
         sourceHash: draft.sourceHash,
         importBatchId: batchId,
@@ -702,11 +685,11 @@ export type MatchTransfersResult = { ok: true; linked: number } | { ok: false; e
  *  which isn't stored on committed transactions, so this only ever matches
  *  same-currency transfers. */
 export async function matchUnlinkedTransfers(): Promise<MatchTransfersResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
 
   const rows = await db.query.transactions.findMany({
     where: and(
-      eq(transactions.householdId, householdId),
+      eq(transactions.userId, userId),
       eq(transactions.type, "transfer"),
       isNull(transactions.transferPeerId),
       isNull(transactions.deletedAt),
@@ -765,10 +748,10 @@ export type UndoImportResult = { ok: true; count: number } | { ok: false; error:
  *  rows (in other batches, or matched by matchUnlinkedTransfers) that
  *  pointed at the deleted rows. */
 export async function undoImportBatch(batchId: string): Promise<UndoImportResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
 
   const batch = await db.query.importBatches.findFirst({
-    where: and(eq(importBatches.id, batchId), eq(importBatches.householdId, householdId)),
+    where: and(eq(importBatches.id, batchId), eq(importBatches.userId, userId)),
   });
   if (!batch) return { ok: false, error: "Import batch not found" };
 
@@ -779,7 +762,7 @@ export async function undoImportBatch(batchId: string): Promise<UndoImportResult
       .where(
         and(
           eq(transactions.importBatchId, batchId),
-          eq(transactions.householdId, householdId),
+          eq(transactions.userId, userId),
           isNull(transactions.deletedAt),
         ),
       );
@@ -801,7 +784,7 @@ export async function undoImportBatch(batchId: string): Promise<UndoImportResult
       .set({ transferPeerId: null, updatedAt: now })
       .where(
         and(
-          eq(transactions.householdId, householdId),
+          eq(transactions.userId, userId),
           inArray(transactions.transferPeerId, deletedIds),
           isNull(transactions.deletedAt),
         ),

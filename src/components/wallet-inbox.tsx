@@ -2,7 +2,6 @@ import {
   assignWalletCaptureAccount,
   dismissWalletCapture,
   recategorizeWalletCapture,
-  shareWalletCapture,
 } from "@/lib/actions/wallet";
 import { formatCents } from "@/lib/domain/money";
 import type { listWalletCaptures } from "@/lib/queries";
@@ -13,11 +12,6 @@ type CaptureRow = Awaited<ReturnType<typeof listWalletCaptures>>[number];
 // `<form action>` wants `(formData) => void | Promise<void>`, but the wallet
 // actions return `ActionResult` for programmatic callers. Adapt with void
 // server-action wrappers rather than changing the actions' shared shape.
-async function shareAction(formData: FormData) {
-  "use server";
-  await shareWalletCapture(formData);
-}
-
 async function recategorizeAction(formData: FormData) {
   "use server";
   await recategorizeWalletCapture(formData);
@@ -91,7 +85,6 @@ export function WalletInbox({
             </div>
             <div className="flex items-center gap-2">
               <Badge>{STATUS_LABEL[row.status]}</Badge>
-              {row.status === "booked" && row.txnVisibility && <Badge>{row.txnVisibility}</Badge>}
             </div>
           </div>
           <p className="text-xs text-faint">
@@ -102,14 +95,6 @@ export function WalletInbox({
 
           {row.status === "booked" && (
             <div className="flex flex-wrap items-end gap-3">
-              {row.txnVisibility === "personal" && (
-                <form action={shareAction}>
-                  <input type="hidden" name="captureId" value={row.id} />
-                  <Button type="submit" variant="secondary" size="sm">
-                    Mark shared
-                  </Button>
-                </form>
-              )}
               <form action={recategorizeAction} className="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="captureId" value={row.id} />
                 <select

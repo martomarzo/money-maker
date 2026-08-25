@@ -1,4 +1,4 @@
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { listCategories } from "@/lib/queries";
 import { CategoryForm } from "@/components/category-form";
 import { ButtonLink, PageHeader } from "@/components/ui";
@@ -8,9 +8,9 @@ export default async function NewCategoryPage({
 }: {
   searchParams: Promise<{ parentId?: string }>;
 }) {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const { parentId } = await searchParams;
-  const categories = await listCategories(householdId);
+  const categories = await listCategories(userId);
   const parentOptions = categories
     .filter((c) => c.parentId === null)
     .map((c) => ({ id: c.id, name: c.name, icon: c.icon }));

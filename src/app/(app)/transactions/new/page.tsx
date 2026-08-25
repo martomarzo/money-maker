@@ -1,5 +1,5 @@
-import { requireMembership } from "@/lib/session";
-import { listCategories, listVisibleAccounts } from "@/lib/queries";
+import { requireUserId } from "@/lib/session";
+import { listAccounts, listCategories } from "@/lib/queries";
 import { TransactionForm } from "@/components/transaction-form";
 import { PageHeader } from "@/components/ui";
 
@@ -12,13 +12,13 @@ function parseMode(value: string | string[] | undefined): Mode | undefined {
 export default async function NewTransactionPage({
   searchParams,
 }: PageProps<"/transactions/new">) {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const { type } = await searchParams;
   const defaultMode = parseMode(type);
 
   const [accounts, categories] = await Promise.all([
-    listVisibleAccounts(householdId, userId),
-    listCategories(householdId),
+    listAccounts(userId),
+    listCategories(userId),
   ]);
 
   const formAccounts = accounts

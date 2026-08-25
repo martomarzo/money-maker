@@ -7,7 +7,6 @@ import { db } from "@/db";
 import {
   categories,
   categoryRules,
-  households,
   transactions,
   walletCaptures,
   walletCardMappings,
@@ -15,7 +14,7 @@ import {
 } from "@/db/schema";
 import type { CategoryRule } from "@/lib/import/engine";
 import { listCategoryRules, usablePostingAccount } from "@/lib/queries";
-import { requireMembership } from "@/lib/session";
+import { requireUser, requireUserId } from "@/lib/session";
 import { bookCapture } from "@/lib/wallet/book";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/wallet/tokens";
 import type { ActionResult } from "./auth";
@@ -43,7 +42,7 @@ export async function createWalletDevice(
   _prev: CreateDeviceResult | null,
   formData: FormData,
 ): Promise<CreateDeviceResult> {
-  const { userId } = await requireMembership();
+  const userId = await requireUserId();
   const name = String(formData.get("name") ?? "").trim();
   if (!name || name.length > 60) {
     return { ok: false, error: "Give the device a name (max 60 chars)" };
@@ -60,7 +59,7 @@ export async function createWalletDevice(
 }
 
 export async function revokeWalletDevice(formData: FormData): Promise<ActionResult> {
-  const { userId } = await requireMembership();
+  const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   await db
     .update(walletDevices)
@@ -71,30 +70,12 @@ export async function revokeWalletDevice(formData: FormData): Promise<ActionResu
 }
 
 export async function deleteWalletCardMapping(formData: FormData): Promise<ActionResult> {
-  const { userId } = await requireMembership();
+  const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   await db
     .delete(walletCardMappings)
     .where(and(eq(walletCardMappings.id, id), eq(walletCardMappings.userId, userId)));
   revalidatePath("/settings/devices");
-  return { ok: true };
-}
-
-export async function shareWalletCapture(formData: FormData): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
-  const capture = await ownCapture(userId, String(formData.get("captureId") ?? ""));
-  if (!capture?.transactionId) return { ok: false, error: "Capture not booked" };
-  await db
-    .update(transactions)
-    .set({ visibility: "shared", updatedAt: new Date() })
-    .where(
-      and(
-        eq(transactions.id, capture.transactionId),
-        eq(transactions.householdId, householdId),
-      ),
-    );
-  revalidatePath("/wallet");
-  revalidatePath("/transactions");
   return { ok: true };
 }
 
@@ -104,7 +85,7 @@ const recategorizeSchema = z.object({
 });
 
 export async function recategorizeWalletCapture(formData: FormData): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const parsed = recategorizeSchema.safeParse({
     captureId: formData.get("captureId"),
     categoryId: formData.get("categoryId"),
@@ -115,25 +96,17 @@ export async function recategorizeWalletCapture(formData: FormData): Promise<Act
   const capture = await ownCapture(userId, parsed.data.captureId);
   if (!capture?.transactionId) return { ok: false, error: "Capture not booked" };
   const category = await db.query.categories.findFirst({
-    where: and(
-      eq(categories.id, parsed.data.categoryId),
-      eq(categories.householdId, householdId),
-    ),
+    where: and(eq(categories.id, parsed.data.categoryId), eq(categories.userId, userId)),
   });
   if (!category) return { ok: false, error: "Category not found" };
 
   await db
     .update(transactions)
     .set({ categoryId: category.id, updatedAt: new Date() })
-    .where(
-      and(
-        eq(transactions.id, capture.transactionId),
-        eq(transactions.householdId, householdId),
-      ),
-    );
+    .where(and(eq(transactions.id, capture.transactionId), eq(transactions.userId, userId)));
   if (alwaysRule && capture.merchant) {
     await db.insert(categoryRules).values({
-      householdId,
+      userId,
       matchText: capture.merchant,
       categoryId: category.id,
     });
@@ -149,7 +122,7 @@ const assignSchema = z.object({
 });
 
 export async function assignWalletCaptureAccount(formData: FormData): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const { userId, baseCurrency } = await requireUser();
   const parsed = assignSchema.safeParse({
     captureId: formData.get("captureId"),
     accountId: formData.get("accountId"),
@@ -162,20 +135,16 @@ export async function assignWalletCaptureAccount(formData: FormData): Promise<Ac
   if (capture.status !== "needs_account") {
     return { ok: false, error: "Capture is not waiting for an account" };
   }
-  const account = await usablePostingAccount(householdId, userId, parsed.data.accountId);
+  const account = await usablePostingAccount(userId, parsed.data.accountId);
   if (!account) return { ok: false, error: "Account not found or not yours" };
 
-  const [household, ruleRows] = await Promise.all([
-    db.query.households.findFirst({ where: eq(households.id, householdId) }),
-    listCategoryRules(householdId),
-  ]);
+  const ruleRows = await listCategoryRules(userId);
   const rules: CategoryRule[] = ruleRows.map((r) => r.rule);
   const txnId = await bookCapture({
     capture: { id: capture.id, raw: capture.raw },
     account: { id: account.id, currency: account.currency },
-    householdId,
     userId,
-    baseCurrency: household!.baseCurrency,
+    baseCurrency,
     rules,
   });
   if (!txnId) {
@@ -197,7 +166,7 @@ export async function assignWalletCaptureAccount(formData: FormData): Promise<Ac
 }
 
 export async function dismissWalletCapture(formData: FormData): Promise<ActionResult> {
-  const { userId } = await requireMembership();
+  const userId = await requireUserId();
   const capture = await ownCapture(userId, String(formData.get("captureId") ?? ""));
   if (!capture) return { ok: false, error: "Capture not found" };
   if (capture.status === "booked") {

@@ -19,7 +19,6 @@ import { capturePayloadSchema } from "./types";
 export interface BookCaptureInput {
   capture: { id: string; raw: unknown };
   account: { id: string; currency: string };
-  householdId: string;
   userId: string;
   baseCurrency: string;
   rules: CategoryRule[];
@@ -74,7 +73,7 @@ export async function bookCapture(input: BookCaptureInput): Promise<string | nul
   await db.transaction(async (tx) => {
     await tx.insert(transactions).values({
       id: txnId,
-      householdId: input.householdId,
+      userId: input.userId,
       accountId: input.account.id,
       createdByUserId: input.userId,
       type: "expense",
@@ -83,7 +82,6 @@ export async function bookCapture(input: BookCaptureInput): Promise<string | nul
       date: parsed.date,
       categoryId,
       payee: parsed.merchant,
-      visibility: "personal",
       fxRateToBase: baseRate == null ? null : baseRate.toFixed(8),
       originalAmount,
       originalCurrency,

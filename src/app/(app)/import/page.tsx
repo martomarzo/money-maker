@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireMembership } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { listRecentImportBatches, listStatementSummaries } from "@/lib/actions/import";
 import { ImportBatchList } from "@/components/import-batch-list";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
@@ -22,7 +22,7 @@ function formatDateRange(from: string | null, to: string | null): string {
 }
 
 export default async function ImportPage() {
-  await requireMembership();
+  await requireUser();
   const [statements, batches] = await Promise.all([
     listStatementSummaries(),
     listRecentImportBatches(),

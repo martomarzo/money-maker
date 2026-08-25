@@ -29,6 +29,13 @@
       "when": 1787138060949,
       "tag": "0003_flippant_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787663658685,
+      "tag": "0004_personal_ledger",
+      "breakpoints": true
     }
   ]
 }

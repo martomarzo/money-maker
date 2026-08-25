@@ -5,11 +5,11 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { households, transactions } from "@/db/schema";
+import { transactions } from "@/db/schema";
 import { centsToDecimalString, toCents } from "@/lib/domain/money";
 import { getRate } from "@/lib/fx";
 import { usablePostingAccount } from "@/lib/queries";
-import { requireMembership } from "@/lib/session";
+import { requireUser, requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date");
@@ -22,7 +22,6 @@ const entrySchema = z.object({
   categoryId: z.uuid().optional().or(z.literal("").transform(() => undefined)),
   payee: z.string().max(120).optional().or(z.literal("").transform(() => undefined)),
   notes: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
-  visibility: z.enum(["shared", "personal"]).default("shared"),
 });
 
 const transferSchema = z.object({
@@ -47,7 +46,7 @@ export async function createTransaction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const { userId, baseCurrency } = await requireUser();
   const parsed = entrySchema.safeParse({
     type: formData.get("type"),
     accountId: formData.get("accountId"),
@@ -56,29 +55,21 @@ export async function createTransaction(
     categoryId: formData.get("categoryId") ?? undefined,
     payee: formData.get("payee") ?? undefined,
     notes: formData.get("notes") ?? undefined,
-    visibility: formData.get("visibility") ?? "shared",
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
-  const account = await usablePostingAccount(householdId, userId, parsed.data.accountId);
+  const account = await usablePostingAccount(userId, parsed.data.accountId);
   if (!account) return { ok: false, error: "Account not found or not yours" };
   const currency = account.currency.trim();
 
   const cents = parsePositiveAmount(parsed.data.amount, currency);
   if (cents == null) return { ok: false, error: "Amount must be a positive number" };
 
-  const household = await db.query.households.findFirst({
-    where: eq(households.id, householdId),
-  });
-  const rate = await getRate(
-    parsed.data.date,
-    currency,
-    household!.baseCurrency.trim(),
-  );
+  const rate = await getRate(parsed.data.date, currency, baseCurrency);
 
   await db.insert(transactions).values({
     id: randomUUID(),
-    householdId,
+    userId,
     accountId: account.id,
     createdByUserId: userId,
     type: parsed.data.type,
@@ -88,7 +79,6 @@ export async function createTransaction(
     categoryId: parsed.data.categoryId,
     payee: parsed.data.payee,
     notes: parsed.data.notes,
-    visibility: parsed.data.visibility,
     fxRateToBase: rate == null ? null : rate.toFixed(8),
   });
 
@@ -101,7 +91,7 @@ export async function createTransfer(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const parsed = transferSchema.safeParse({
     fromAccountId: formData.get("fromAccountId"),
     toAccountId: formData.get("toAccountId"),
@@ -116,8 +106,8 @@ export async function createTransfer(
   }
 
   const [from, to] = await Promise.all([
-    usablePostingAccount(householdId, userId, parsed.data.fromAccountId),
-    usablePostingAccount(householdId, userId, parsed.data.toAccountId),
+    usablePostingAccount(userId, parsed.data.fromAccountId),
+    usablePostingAccount(userId, parsed.data.toAccountId),
   ]);
   if (!from || !to) return { ok: false, error: "Account not found or not yours" };
   const fromCurrency = from.currency.trim();
@@ -147,12 +137,11 @@ export async function createTransfer(
   const outId = randomUUID();
   const inId = randomUUID();
   const shared = {
-    householdId,
+    userId,
     createdByUserId: userId,
     type: "transfer" as const,
     date: parsed.data.date,
     notes: parsed.data.notes,
-    visibility: "shared" as const,
   };
 
   await db.transaction(async (tx) => {
@@ -183,13 +172,13 @@ export async function updateTransaction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const { userId, baseCurrency } = await requireUser();
   const id = String(formData.get("id") ?? "");
 
   const existing = await db.query.transactions.findFirst({
     where: and(
       eq(transactions.id, id),
-      eq(transactions.householdId, householdId),
+      eq(transactions.userId, userId),
       isNull(transactions.deletedAt),
     ),
   });
@@ -197,7 +186,7 @@ export async function updateTransaction(
   if (existing.type === "transfer") {
     return { ok: false, error: "Delete and recreate transfers to change them" };
   }
-  const account = await usablePostingAccount(householdId, userId, existing.accountId);
+  const account = await usablePostingAccount(userId, existing.accountId);
   if (!account) return { ok: false, error: "Not your transaction to edit" };
 
   const parsed = entrySchema.safeParse({
@@ -208,7 +197,6 @@ export async function updateTransaction(
     categoryId: formData.get("categoryId") ?? undefined,
     payee: formData.get("payee") ?? undefined,
     notes: formData.get("notes") ?? undefined,
-    visibility: formData.get("visibility") ?? existing.visibility,
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
@@ -219,10 +207,7 @@ export async function updateTransaction(
   // Re-snapshot the rate if the date changed.
   let fxRateToBase = existing.fxRateToBase;
   if (parsed.data.date !== existing.date) {
-    const household = await db.query.households.findFirst({
-      where: eq(households.id, householdId),
-    });
-    const rate = await getRate(parsed.data.date, currency, household!.baseCurrency.trim());
+    const rate = await getRate(parsed.data.date, currency, baseCurrency);
     fxRateToBase = rate == null ? null : rate.toFixed(8);
   }
 
@@ -235,7 +220,6 @@ export async function updateTransaction(
       categoryId: parsed.data.categoryId ?? null,
       payee: parsed.data.payee ?? null,
       notes: parsed.data.notes ?? null,
-      visibility: parsed.data.visibility,
       fxRateToBase,
       updatedAt: new Date(),
     })
@@ -247,16 +231,16 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<ActionResult> {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const existing = await db.query.transactions.findFirst({
     where: and(
       eq(transactions.id, id),
-      eq(transactions.householdId, householdId),
+      eq(transactions.userId, userId),
       isNull(transactions.deletedAt),
     ),
   });
   if (!existing) return { ok: false, error: "Transaction not found" };
-  const account = await usablePostingAccount(householdId, userId, existing.accountId);
+  const account = await usablePostingAccount(userId, existing.accountId);
   if (!account) return { ok: false, error: "Not your transaction to delete" };
 
   const now = new Date();

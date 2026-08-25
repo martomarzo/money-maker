@@ -1,10 +1,10 @@
 import Link from "next/link";
-import type { listTransactions } from "@/lib/queries";
+import type { TransactionListRow } from "@/lib/queries";
 import { formatCents, toCents } from "@/lib/domain/money";
 import { Badge } from "@/components/ui";
 
 export type TransactionType = "expense" | "income" | "transfer";
-export type TransactionRow = Awaited<ReturnType<typeof listTransactions>>[number];
+export type TransactionRow = TransactionListRow;
 
 export function isTransactionType(value: string | undefined): value is TransactionType {
   return value === "expense" || value === "income" || value === "transfer";
@@ -51,20 +51,16 @@ export function amountColorClass(type: TransactionType): string {
 
 export function TransactionRowItem({
   row,
-  showCreator,
   showDate = false,
 }: {
   row: TransactionRow;
-  showCreator: boolean;
   showDate?: boolean;
 }) {
-  const { transaction: t, accountName, categoryName, categoryIcon, createdByName } = row;
+  const { transaction: t, accountName, categoryName, categoryIcon, share } = row;
   const isTransfer = t.type === "transfer";
   const label = t.payee ?? categoryName ?? typeLabel(t.type);
   const icon = categoryIcon ?? typeMarker(t.type);
-  const meta = [showDate ? t.date : null, accountName, showCreator ? createdByName : null]
-    .filter(Boolean)
-    .join(" · ");
+  const meta = [showDate ? t.date : null, accountName].filter(Boolean).join(" · ");
 
   const content = (
     <>
@@ -75,7 +71,7 @@ export function TransactionRowItem({
         <div className="flex min-w-0 flex-col">
           <span className="flex items-center gap-2 truncate text-sm font-medium">
             <span className="truncate">{label}</span>
-            {t.visibility === "personal" && <Badge>personal</Badge>}
+            {share && <Badge tone="accent">{share.householdName}</Badge>}
           </span>
           <span className="truncate text-xs text-muted">{meta}</span>
         </div>

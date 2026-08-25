@@ -6,8 +6,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  households,
-  memberships,
+  users,
   walletCaptures,
   walletCardMappings,
   walletDevices,
@@ -73,14 +72,6 @@ export async function POST(req: Request) {
   if (!read) return Response.json({ error: "empty body" }, { status: 400 });
   const { payload, rawFallbackText } = read;
 
-  const membership = await db.query.memberships.findFirst({
-    where: eq(memberships.userId, device.userId),
-  });
-  if (!membership) {
-    return Response.json({ error: "device user has no household" }, { status: 403 });
-  }
-  const householdId = membership.householdId;
-
   const parsed = parseCapture(payload);
   const cardKey = parsed?.cardKey ? normalizeCardKey(parsed.cardKey) : null;
 
@@ -94,7 +85,7 @@ export async function POST(req: Request) {
       ),
     });
     if (mapping) {
-      const row = await usablePostingAccount(householdId, device.userId, mapping.accountId);
+      const row = await usablePostingAccount(device.userId, mapping.accountId);
       if (row) account = { id: row.id, currency: row.currency };
     }
   }
@@ -137,17 +128,16 @@ export async function POST(req: Request) {
   const captureId = inserted[0].id;
 
   if (parsed && account) {
-    const [household, ruleRows] = await Promise.all([
-      db.query.households.findFirst({ where: eq(households.id, householdId) }),
-      listCategoryRules(householdId),
+    const [user, ruleRows] = await Promise.all([
+      db.query.users.findFirst({ where: eq(users.id, device.userId) }),
+      listCategoryRules(device.userId),
     ]);
     const rules: CategoryRule[] = ruleRows.map((r) => r.rule);
     const txnId = await bookCapture({
       capture: { id: captureId, raw: payload },
       account,
-      householdId,
       userId: device.userId,
-      baseCurrency: household!.baseCurrency,
+      baseCurrency: user!.baseCurrency,
       rules,
     });
     if (txnId) {

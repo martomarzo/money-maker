@@ -14,11 +14,14 @@ interface NavItem {
 const primaryNav: NavItem[] = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/transactions", label: "Transactions", icon: ListIcon },
-  { href: "/accounts", label: "Accounts", icon: WalletIcon },
-  { href: "/settings/categories", label: "Settings", icon: SettingsIcon, match: "/settings" },
+  { href: "/households", label: "Households", icon: PeopleIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
-const secondaryNav: NavItem[] = [{ href: "/import", label: "Import", icon: ListIcon }];
+const secondaryNav: NavItem[] = [
+  { href: "/accounts", label: "Accounts", icon: WalletIcon },
+  { href: "/import", label: "Import", icon: ListIcon },
+];
 
 function isActive(pathname: string, href: string, match?: string) {
   const base = match ?? href;
@@ -31,6 +34,7 @@ export function AppShell({
   signOut,
   children,
 }: {
+  /** Secondary line under the wordmark (the signed-in user's name). */
   householdName?: string;
   signOut: ReactNode;
   children: ReactNode;
@@ -52,7 +56,7 @@ export function AppShell({
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {[...primaryNav, ...secondaryNav].map((item) => {
+            {[primaryNav[0], primaryNav[1], secondaryNav[0], primaryNav[2], secondaryNav[1], primaryNav[3]].map((item) => {
               const active = isActive(pathname, item.href, item.match);
               return (
                 <Link
@@ -170,6 +174,16 @@ function WalletIcon({ className = "" }: { className?: string }) {
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M3 7a2 2 0 0 1 2-2h13v4H5a2 2 0 0 1-2-2zm0 0v10a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5" />
       <circle cx="16.5" cy="14" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+function PeopleIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 14.5a5 5 0 0 1 6 5" />
     </svg>
   );
 }

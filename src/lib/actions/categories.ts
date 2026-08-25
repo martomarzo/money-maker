@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { accounts, categories, categoryRules } from "@/db/schema";
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
 const categorySchema = z.object({
@@ -34,12 +34,12 @@ const ruleSchema = z.object({
   priority: z.coerce.number().int().default(0),
 });
 
-/** Validates a proposed parentId: must be a non-deleted top-level category in
- *  the household. When editing an existing category (`excludeCategoryId`),
+/** Validates a proposed parentId: must be a non-deleted top-level category
+ *  owned by the user. When editing an existing category (`excludeCategoryId`),
  *  also rejects self-parenting and re-parenting a category that already has
  *  children (would create two levels of nesting). */
 async function validateParent(
-  householdId: string,
+  userId: string,
   parentId: string,
   excludeCategoryId?: string,
 ): Promise<string | null> {
@@ -50,7 +50,7 @@ async function validateParent(
   const parent = await db.query.categories.findFirst({
     where: and(
       eq(categories.id, parentId),
-      eq(categories.householdId, householdId),
+      eq(categories.userId, userId),
       isNull(categories.deletedAt),
     ),
   });
@@ -78,7 +78,7 @@ export async function createCategory(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     icon: formData.get("icon") ?? undefined,
@@ -87,12 +87,12 @@ export async function createCategory(
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   if (parsed.data.parentId) {
-    const error = await validateParent(householdId, parsed.data.parentId);
+    const error = await validateParent(userId, parsed.data.parentId);
     if (error) return { ok: false, error };
   }
 
   await db.insert(categories).values({
-    householdId,
+    userId,
     parentId: parsed.data.parentId ?? null,
     name: parsed.data.name,
     icon: parsed.data.icon ?? null,
@@ -106,7 +106,7 @@ export async function updateCategory(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");
   const parsed = updateCategorySchema.safeParse({
     name: formData.get("name"),
@@ -119,14 +119,14 @@ export async function updateCategory(
   const existing = await db.query.categories.findFirst({
     where: and(
       eq(categories.id, id),
-      eq(categories.householdId, householdId),
+      eq(categories.userId, userId),
       isNull(categories.deletedAt),
     ),
   });
   if (!existing) return { ok: false, error: "Category not found" };
 
   if (parsed.data.parentId) {
-    const error = await validateParent(householdId, parsed.data.parentId, id);
+    const error = await validateParent(userId, parsed.data.parentId, id);
     if (error) return { ok: false, error };
   }
 
@@ -149,11 +149,11 @@ export async function updateCategory(
  *  any children it has. Transactions keep their categoryId — that's fine,
  *  archived categories just stop showing up for new entries. */
 export async function archiveCategory(id: string): Promise<ActionResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const existing = await db.query.categories.findFirst({
     where: and(
       eq(categories.id, id),
-      eq(categories.householdId, householdId),
+      eq(categories.userId, userId),
       isNull(categories.deletedAt),
     ),
   });
@@ -179,7 +179,7 @@ export async function createCategoryRule(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const parsed = ruleSchema.safeParse({
     matchText: formData.get("matchText"),
     categoryId: formData.get("categoryId"),
@@ -192,7 +192,7 @@ export async function createCategoryRule(
   const category = await db.query.categories.findFirst({
     where: and(
       eq(categories.id, parsed.data.categoryId),
-      eq(categories.householdId, householdId),
+      eq(categories.userId, userId),
       isNull(categories.deletedAt),
     ),
   });
@@ -202,7 +202,7 @@ export async function createCategoryRule(
     const account = await db.query.accounts.findFirst({
       where: and(
         eq(accounts.id, parsed.data.accountId),
-        eq(accounts.householdId, householdId),
+        eq(accounts.userId, userId),
         isNull(accounts.deletedAt),
       ),
     });
@@ -210,7 +210,7 @@ export async function createCategoryRule(
   }
 
   await db.insert(categoryRules).values({
-    householdId,
+    userId,
     matchText: parsed.data.matchText,
     accountId: parsed.data.accountId ?? null,
     currency: parsed.data.currency ?? null,
@@ -223,11 +223,11 @@ export async function createCategoryRule(
 }
 
 export async function deleteCategoryRule(id: string): Promise<ActionResult> {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const existing = await db.query.categoryRules.findFirst({
     where: and(
       eq(categoryRules.id, id),
-      eq(categoryRules.householdId, householdId),
+      eq(categoryRules.userId, userId),
       isNull(categoryRules.deletedAt),
     ),
   });

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { previewStatement } from "@/lib/actions/import";
-import { requireMembership } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { ImportPreview } from "@/components/import-preview";
 
 export default async function ImportStatementPage({
@@ -9,7 +9,7 @@ export default async function ImportStatementPage({
 }: {
   params: Promise<{ file: string }>;
 }) {
-  await requireMembership();
+  await requireUser();
   const { file } = await params;
   const preview = await previewStatement(file);
   if (!preview) notFound();

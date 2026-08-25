@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { fxRates, households, transactions } from "@/db/schema";
+import { fxRates, transactions, users } from "@/db/schema";
 
 // Provider: open.er-api.com — free, keyless, daily rates, covers ARS/PYG.
 // We store rates pivoted on EUR: (date, 'EUR', X, rate). Any X→Y rate is
@@ -95,10 +95,10 @@ export async function backfillMissingFxRates(): Promise<number> {
       id: transactions.id,
       date: transactions.date,
       currency: transactions.currency,
-      baseCurrency: households.baseCurrency,
+      baseCurrency: users.baseCurrency,
     })
     .from(transactions)
-    .innerJoin(households, eq(transactions.householdId, households.id))
+    .innerJoin(users, eq(transactions.userId, users.id))
     .where(and(isNull(transactions.fxRateToBase), isNull(transactions.deletedAt)))
     .limit(500);
 

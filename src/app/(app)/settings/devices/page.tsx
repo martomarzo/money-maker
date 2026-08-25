@@ -1,10 +1,10 @@
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { listWalletCardMappings, listWalletDevices } from "@/lib/queries";
 import { WalletDevicesPanel } from "@/components/wallet-devices-panel";
 import { PageHeader } from "@/components/ui";
 
 export default async function DevicesSettingsPage() {
-  const { userId } = await requireMembership();
+  const userId = await requireUserId();
   const [devices, mappings] = await Promise.all([
     listWalletDevices(userId),
     listWalletCardMappings(userId),

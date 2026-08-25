@@ -1,14 +1,5 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { households } from "@/db/schema";
-import { requireMembership } from "@/lib/session";
-import {
-  listCategories,
-  listMembers,
-  listTransactions,
-  listVisibleAccounts,
-  summarizeTransactions,
-} from "@/lib/queries";
+import { requireUser } from "@/lib/session";
+import { listAccounts, listCategories, listTransactions, summarizeTransactions } from "@/lib/queries";
 import { formatCents } from "@/lib/domain/money";
 import { TransactionFilters } from "@/components/transaction-filters";
 import {
@@ -62,7 +53,7 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { userId, householdId } = await requireMembership();
+  const { userId, baseCurrency } = await requireUser();
   const params = await searchParams;
 
   function getParam(key: string): string | undefined {
@@ -72,27 +63,25 @@ export default async function TransactionsPage({
 
   const accountParam = getParam("account");
   const categoryParam = getParam("category");
-  const personParam = getParam("person");
   const typeParam = getParam("type");
+  const sharedParam = getParam("shared");
   const fromParam = getParam("from");
   const toParam = getParam("to");
+  const shared = sharedParam === "yes" || sharedParam === "no" ? sharedParam : undefined;
 
-  const [household, allAccounts, categories, members, rows] = await Promise.all([
-    db.query.households.findFirst({ where: eq(households.id, householdId) }),
-    listVisibleAccounts(householdId, userId),
-    listCategories(householdId),
-    listMembers(householdId),
-    listTransactions(householdId, userId, {
+  const [allAccounts, categories, rows] = await Promise.all([
+    listAccounts(userId),
+    listCategories(userId),
+    listTransactions(userId, {
       accountId: accountParam,
       categoryId: categoryParam,
-      createdByUserId: personParam,
       type: isTransactionType(typeParam) ? typeParam : undefined,
+      shared,
       from: fromParam,
       to: toParam,
     }),
   ]);
 
-  const baseCurrency = (household?.baseCurrency ?? "EUR").trim();
   const summary = summarizeTransactions(rows, baseCurrency);
 
   const formAccounts = allAccounts
@@ -105,8 +94,6 @@ export default async function TransactionsPage({
     list.push(row);
     groups.set(row.transaction.date, list);
   }
-
-  const showCreator = members.length >= 2;
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -122,11 +109,10 @@ export default async function TransactionsPage({
       <TransactionFilters
         accounts={formAccounts}
         categories={categories}
-        members={members}
         account={accountParam}
         category={categoryParam}
-        person={personParam}
         type={typeParam}
+        shared={sharedParam}
         from={fromParam}
         to={toParam}
       />
@@ -147,11 +133,7 @@ export default async function TransactionsPage({
               </h2>
               <div className="flex flex-col gap-2">
                 {dateRows.map((row) => (
-                  <TransactionRowItem
-                    key={row.transaction.id}
-                    row={row}
-                    showCreator={showCreator}
-                  />
+                  <TransactionRowItem key={row.transaction.id} row={row} />
                 ))}
               </div>
             </div>

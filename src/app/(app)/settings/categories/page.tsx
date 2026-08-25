@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import {
+  listAccounts,
   listCategories,
   listCategoryRules,
-  listVisibleAccounts,
 } from "@/lib/queries";
 import { CategoryRulesPanel } from "@/components/category-rules-panel";
 import { Badge, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
@@ -25,11 +25,11 @@ function CategoryLink({ category }: { category: Category }) {
 }
 
 export default async function CategoriesSettingsPage() {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const [categories, rules, accounts] = await Promise.all([
-    listCategories(householdId),
-    listCategoryRules(householdId),
-    listVisibleAccounts(householdId, userId),
+    listCategories(userId),
+    listCategoryRules(userId),
+    listAccounts(userId),
   ]);
 
   const parents = categories.filter((c) => c.parentId === null);

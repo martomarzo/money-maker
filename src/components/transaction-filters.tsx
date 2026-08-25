@@ -20,19 +20,13 @@ interface CategoryOption {
   icon: string | null;
 }
 
-interface MemberOption {
-  id: string;
-  displayName: string;
-}
-
 interface TransactionFiltersProps {
   accounts: AccountOption[];
   categories: CategoryOption[];
-  members: MemberOption[];
   account?: string;
   category?: string;
-  person?: string;
   type?: string;
+  shared?: string;
   from?: string;
   to?: string;
 }
@@ -43,14 +37,18 @@ const TYPE_OPTIONS = [
   { value: "transfer", label: "Transfer" },
 ];
 
+const SHARED_OPTIONS = [
+  { value: "yes", label: "Shared" },
+  { value: "no", label: "Not shared" },
+];
+
 export function TransactionFilters({
   accounts,
   categories,
-  members,
   account,
   category,
-  person,
   type,
+  shared,
   from,
   to,
 }: TransactionFiltersProps) {
@@ -60,8 +58,8 @@ export function TransactionFilters({
     const current: Record<string, string | undefined> = {
       account,
       category,
-      person,
       type,
+      shared,
       from,
       to,
     };
@@ -132,20 +130,6 @@ export function TransactionFilters({
       </select>
 
       <select
-        aria-label="Person"
-        value={person ?? ""}
-        onChange={(e) => updateParam("person", e.target.value)}
-        className={filterSelectClass}
-      >
-        <option value="">Everyone</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.displayName}
-          </option>
-        ))}
-      </select>
-
-      <select
         aria-label="Type"
         value={type ?? ""}
         onChange={(e) => updateParam("type", e.target.value)}
@@ -155,6 +139,20 @@ export function TransactionFilters({
         {TYPE_OPTIONS.map((t) => (
           <option key={t.value} value={t.value}>
             {t.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        aria-label="Shared"
+        value={shared ?? ""}
+        onChange={(e) => updateParam("shared", e.target.value)}
+        className={filterSelectClass}
+      >
+        <option value="">All transactions</option>
+        {SHARED_OPTIONS.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
           </option>
         ))}
       </select>

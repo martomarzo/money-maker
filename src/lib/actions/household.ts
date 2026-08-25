@@ -2,102 +2,73 @@
 
 import { randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { DEFAULT_CATEGORIES } from "@/db/default-categories";
-import { DEFAULT_CATEGORY_RULES } from "@/db/default-category-rules";
-import { categories, categoryRules, households, invites, memberships } from "@/db/schema";
-import { requireUserId } from "@/lib/session";
+import { households, invites, memberships, users } from "@/db/schema";
+import { requireHouseholdMember, requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
 
 const CURRENCIES = ["EUR", "USD", "ARS", "PYG"] as const;
 
-const createHouseholdSchema = z.object({
+const householdSchema = z.object({
   name: z.string().min(1, "Give your household a name").max(80),
   baseCurrency: z.enum(CURRENCIES),
 });
 
+/** Create a household and make the caller its owner. Households own no
+ *  ledger data — members share transactions into them (Phase 1.9). */
 export async function createHousehold(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   const userId = await requireUserId();
-  const parsed = createHouseholdSchema.safeParse({
+  const parsed = householdSchema.safeParse({
     name: formData.get("name"),
     baseCurrency: formData.get("baseCurrency"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0].message };
-  }
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
-  await db.transaction(async (tx) => {
+  const householdId = await db.transaction(async (tx) => {
     const [household] = await tx
       .insert(households)
       .values({ name: parsed.data.name, baseCurrency: parsed.data.baseCurrency })
-      .returning();
-
-    await tx.insert(memberships).values({
-      householdId: household.id,
-      userId,
-      role: "owner",
-    });
-
-    const categoryIdByName = new Map<string, string>();
-    for (const [i, parent] of DEFAULT_CATEGORIES.entries()) {
-      const [parentRow] = await tx
-        .insert(categories)
-        .values({
-          householdId: household.id,
-          name: parent.name,
-          icon: parent.icon,
-          sortOrder: i,
-        })
-        .returning();
-      categoryIdByName.set(parentRow.name, parentRow.id);
-      if (parent.children?.length) {
-        const childRows = await tx
-          .insert(categories)
-          .values(
-            parent.children.map((child, j) => ({
-              householdId: household.id,
-              parentId: parentRow.id,
-              name: child.name,
-              icon: child.icon,
-              sortOrder: j,
-            })),
-          )
-          .returning();
-        for (const childRow of childRows) {
-          categoryIdByName.set(childRow.name, childRow.id);
-        }
-      }
-    }
-
-    const ruleRows = DEFAULT_CATEGORY_RULES.flatMap((rule) => {
-      const categoryId = categoryIdByName.get(rule.categoryName);
-      return categoryId
-        ? [{ householdId: household.id, matchText: rule.matchText, categoryId, priority: 100 }]
-        : [];
-    });
-    if (ruleRows.length > 0) {
-      await tx.insert(categoryRules).values(ruleRows);
-    }
+      .returning({ id: households.id });
+    await tx.insert(memberships).values({ householdId: household.id, userId, role: "owner" });
+    return household.id;
   });
 
-  redirect("/");
+  redirect(`/households/${householdId}`);
 }
 
-export async function createInvite(): Promise<{ code: string }> {
-  const userId = await requireUserId();
-  const membership = await db.query.memberships.findFirst({
-    where: eq(memberships.userId, userId),
+export async function updateHousehold(
+  householdId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { role } = await requireHouseholdMember(householdId);
+  if (role !== "owner") return { ok: false, error: "Only the owner can edit the household" };
+  const parsed = householdSchema.safeParse({
+    name: formData.get("name"),
+    baseCurrency: formData.get("baseCurrency"),
   });
-  if (!membership) redirect("/onboarding");
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
+  await db
+    .update(households)
+    .set({ name: parsed.data.name, baseCurrency: parsed.data.baseCurrency })
+    .where(eq(households.id, householdId));
+  revalidatePath(`/households/${householdId}`);
+  revalidatePath("/households");
+  return { ok: true };
+}
+
+export async function createInvite(householdId: string): Promise<{ code: string }> {
+  const { userId } = await requireHouseholdMember(householdId);
   const code = randomBytes(6).toString("base64url");
   await db.insert(invites).values({
-    householdId: membership.householdId,
+    householdId,
     code,
     createdByUserId: userId,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -114,33 +85,36 @@ export async function joinHousehold(
   if (!code) return { ok: false, error: "Enter an invite code" };
 
   const invite = await db.query.invites.findFirst({
-    where: and(
-      eq(invites.code, code),
-      isNull(invites.usedByUserId),
-      gt(invites.expiresAt, new Date()),
-    ),
+    where: and(eq(invites.code, code), isNull(invites.usedByUserId), gt(invites.expiresAt, new Date())),
   });
   if (!invite) return { ok: false, error: "Invite is invalid or expired" };
 
   const existing = await db.query.memberships.findFirst({
-    where: and(
-      eq(memberships.userId, userId),
-      eq(memberships.householdId, invite.householdId),
-    ),
+    where: and(eq(memberships.userId, userId), eq(memberships.householdId, invite.householdId)),
   });
   if (!existing) {
     await db.transaction(async (tx) => {
-      await tx.insert(memberships).values({
-        householdId: invite.householdId,
-        userId,
-        role: "member",
-      });
-      await tx
-        .update(invites)
-        .set({ usedByUserId: userId })
-        .where(eq(invites.id, invite.id));
+      await tx.insert(memberships).values({ householdId: invite.householdId, userId, role: "member" });
+      await tx.update(invites).set({ usedByUserId: userId }).where(eq(invites.id, invite.id));
     });
   }
 
-  redirect("/");
+  redirect(`/households/${invite.householdId}`);
+}
+
+const settingsSchema = z.object({ baseCurrency: z.enum(CURRENCIES) });
+
+/** Personal-ledger settings (currently just the base currency). */
+export async function updatePersonalSettings(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+  const parsed = settingsSchema.safeParse({ baseCurrency: formData.get("baseCurrency") });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  await db.update(users).set({ baseCurrency: parsed.data.baseCurrency }).where(eq(users.id, userId));
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  revalidatePath("/settings");
+  return { ok: true };
 }

@@ -263,7 +263,7 @@ sticky header with logo mark, desktop nav, mobile bottom tab bar
 (Home / Transactions / + / Accounts / Settings). Every page uses the
 primitives; no raw `black/white` opacity classes remain.
 
-### Phase 1.9 — Personal ledger & households (agreed 2026-08-25, NEXT — before 1.8 quick-add and 1.6 budgets)
+### Phase 1.9 — Personal ledger & households (BUILT 2026-08-25 — deploy + live check pending)
 
 Fundamental restructure, decided with the user 2026-08-25 after the
 "personal by default" question: **all data is private to its user; sharing
@@ -277,6 +277,15 @@ zero shares; personal budgets first, household budgets later; member
 balances shown read-only, settle-up action later.
 **Full spec + migration plan + build order:**
 `docs/superpowers/specs/2026-08-25-personal-ledger-and-households.md`.
+As built: migration `0004_personal_ledger` (DDL from drizzle-kit + hand-written
+guarded data migration), `src/lib/domain/split.ts` (even split, validation,
+8 tests), `src/lib/session.ts` (`requireUser`, `requireHouseholdMember`),
+`src/lib/queries.ts` split into personal vs household families,
+`src/lib/actions/shares.ts`, `/households`, `/households/[id]` (month feed,
+by-category, member balances), `/households/[id]/settings`, `/settings`
+(personal base currency), share sheet on the transaction edit page, nav
+Home / Transactions / + / Households / Settings. Onboarding no longer forces
+a household; categories+rules seed at registration.
 
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.

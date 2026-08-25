@@ -1,9 +1,9 @@
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { AccountForm } from "@/components/account-form";
 import { ButtonLink, PageHeader } from "@/components/ui";
 
 export default async function NewAccountPage() {
-  await requireMembership();
+  await requireUserId();
 
   return (
     <div className="flex flex-1 flex-col gap-6">

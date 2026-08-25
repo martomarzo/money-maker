@@ -1,6 +1,6 @@
 # Personal ledger & households — design (2026-08-25)
 
-Status: **agreed with the user 2026-08-25, not yet built.** Supersedes the
+Status: **built 2026-08-25 (steps 1–5 of §7); step 6 (deploy + live verification) pending.** Supersedes the
 "household owns everything + visibility flag" model from plan.md §3.
 
 ## 1. Why

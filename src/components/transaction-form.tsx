@@ -32,7 +32,6 @@ interface EditableTransaction {
   categoryId: string | null;
   payee: string | null;
   notes: string | null;
-  visibility: "shared" | "personal";
   accountId: string;
   accountName: string;
   currency: string;
@@ -373,17 +372,6 @@ export function TransactionForm({
               className={inputClass}
             />
           </div>
-
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              name="visibility"
-              value="personal"
-              defaultChecked={transaction?.visibility === "personal"}
-              className="h-4 w-4 rounded border-border text-accent focus:ring-2 focus:ring-ring"
-            />
-            Personal — hide from partner
-          </label>
 
           {entryState && !entryState.ok && <ErrorText>{entryState.error}</ErrorText>}
 

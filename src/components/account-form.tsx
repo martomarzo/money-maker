@@ -11,7 +11,7 @@ type Account = typeof accounts.$inferSelect;
 
 export type AccountFormAccount = Pick<
   Account,
-  "id" | "name" | "type" | "currency" | "country" | "initialBalance" | "ownerUserId" | "archived"
+  "id" | "name" | "type" | "currency" | "country" | "initialBalance" | "archived"
 >;
 
 const ACCOUNT_TYPES = [
@@ -134,16 +134,6 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
             className={`${inputClass} tnum`}
           />
         </div>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="personal"
-            defaultChecked={Boolean(account?.ownerUserId)}
-            className="h-4 w-4 rounded border-border"
-          />
-          Personal account — only visible to me
-        </label>
 
         {state && !state.ok && <ErrorText>{state.error}</ErrorText>}
 

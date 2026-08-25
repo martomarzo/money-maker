@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import { listCategories } from "@/lib/queries";
 import { CategoryForm } from "@/components/category-form";
 import { ButtonLink, PageHeader } from "@/components/ui";
@@ -12,19 +12,19 @@ export default async function EditCategoryPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { householdId } = await requireMembership();
+  const userId = await requireUserId();
   const { id } = await params;
 
   const category = await db.query.categories.findFirst({
     where: and(
       eq(categories.id, id),
-      eq(categories.householdId, householdId),
+      eq(categories.userId, userId),
       isNull(categories.deletedAt),
     ),
   });
   if (!category) notFound();
 
-  const allCategories = await listCategories(householdId);
+  const allCategories = await listCategories(userId);
   const parentOptions = allCategories
     .filter((c) => c.parentId === null && c.id !== category.id)
     .map((c) => ({ id: c.id, name: c.name, icon: c.icon }));

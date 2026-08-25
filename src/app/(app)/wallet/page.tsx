@@ -1,18 +1,18 @@
-import { requireMembership } from "@/lib/session";
+import { requireUserId } from "@/lib/session";
 import {
+  listAccounts,
   listCategories,
-  listVisibleAccounts,
   listWalletCaptures,
 } from "@/lib/queries";
 import { WalletInbox } from "@/components/wallet-inbox";
 import { PageHeader } from "@/components/ui";
 
 export default async function WalletPage() {
-  const { userId, householdId } = await requireMembership();
+  const userId = await requireUserId();
   const [captures, accounts, categories] = await Promise.all([
     listWalletCaptures(userId),
-    listVisibleAccounts(householdId, userId),
-    listCategories(householdId),
+    listAccounts(userId),
+    listCategories(userId),
   ]);
 
   return (
