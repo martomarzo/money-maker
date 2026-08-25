@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { createCategoryRule, deleteCategoryRule } from "@/lib/actions/categories";
+import { Button, Card, EmptyState, ErrorText, inputClass, labelClass, selectClass } from "@/components/ui";
 
 interface CategoryOption {
   id: string;
@@ -29,9 +30,6 @@ interface RuleRow {
   categoryName: string;
   categoryIcon: string | null;
 }
-
-const inputClass =
-  "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30";
 
 export function CategoryRulesPanel({
   rules,
@@ -82,24 +80,21 @@ export function CategoryRulesPanel({
     <section className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold tracking-tight">Auto-categorization rules</h2>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="text-sm text-muted">
           Suggested at import preview time when a transaction&rsquo;s description contains
           the match text. Lower priority number wins ties.
         </p>
       </div>
 
       {rules.length === 0 ? (
-        <p className="text-sm text-black/60 dark:text-white/60">No rules yet.</p>
+        <EmptyState title="No rules yet" />
       ) : (
         <div className="flex flex-col gap-2">
           {rules.map(({ rule, categoryName, categoryIcon }) => (
-            <div
-              key={rule.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-black/10 p-3 text-sm dark:border-white/15"
-            >
+            <Card key={rule.id} className="flex items-center justify-between gap-3 p-3">
               <div className="flex flex-col gap-0.5">
                 <span className="font-medium">&ldquo;{rule.matchText}&rdquo;</span>
-                <span className="text-xs text-black/50 dark:text-white/50">
+                <span className="text-xs text-muted">
                   {categoryIcon ? `${categoryIcon} ` : ""}
                   {categoryName}
                   {rule.currency ? ` · ${rule.currency}` : ""}
@@ -109,28 +104,29 @@ export function CategoryRulesPanel({
                   {` · priority ${rule.priority}`}
                 </span>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={() => handleDelete(rule.id)}
                 disabled={isDeleting && deletingId === rule.id}
-                className="rounded-md border border-red-600/40 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-60 dark:border-red-400/40 dark:text-red-400"
               >
                 {isDeleting && deletingId === rule.id ? "Deleting..." : "Delete"}
-              </button>
-            </div>
+              </Button>
+            </Card>
           ))}
         </div>
       )}
 
-      {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
+      {deleteError && <ErrorText>{deleteError}</ErrorText>}
 
       <form
         ref={formRef}
         action={formAction}
-        className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15"
+        className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
       >
         <div className="flex flex-col gap-1">
-          <label htmlFor="matchText" className="text-sm font-medium">
+          <label htmlFor="matchText" className={labelClass}>
             Match text
           </label>
           <input
@@ -146,7 +142,7 @@ export function CategoryRulesPanel({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="categoryId" className="text-sm font-medium">
+          <label htmlFor="categoryId" className={labelClass}>
             Category
           </label>
           <select
@@ -154,7 +150,7 @@ export function CategoryRulesPanel({
             name="categoryId"
             required
             defaultValue=""
-            className={inputClass}
+            className={selectClass}
           >
             <option value="" disabled>
               Select a category
@@ -185,8 +181,8 @@ export function CategoryRulesPanel({
 
         <div className="flex gap-3">
           <div className="flex flex-1 flex-col gap-1">
-            <label htmlFor="currency" className="text-sm font-medium">
-              Currency <span className="text-black/40 dark:text-white/40">(optional)</span>
+            <label htmlFor="currency" className={labelClass}>
+              Currency <span className="text-faint">(optional)</span>
             </label>
             <input
               id="currency"
@@ -198,10 +194,10 @@ export function CategoryRulesPanel({
             />
           </div>
           <div className="flex flex-1 flex-col gap-1">
-            <label htmlFor="accountId" className="text-sm font-medium">
-              Account <span className="text-black/40 dark:text-white/40">(optional)</span>
+            <label htmlFor="accountId" className={labelClass}>
+              Account <span className="text-faint">(optional)</span>
             </label>
-            <select id="accountId" name="accountId" defaultValue="" className={inputClass}>
+            <select id="accountId" name="accountId" defaultValue="" className={selectClass}>
               <option value="">Any account</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -213,7 +209,7 @@ export function CategoryRulesPanel({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="priority" className="text-sm font-medium">
+          <label htmlFor="priority" className={labelClass}>
             Priority
           </label>
           <input
@@ -221,21 +217,15 @@ export function CategoryRulesPanel({
             name="priority"
             type="number"
             defaultValue={0}
-            className={inputClass}
+            className={`${inputClass} tnum`}
           />
         </div>
 
-        {state && !state.ok && (
-          <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-        )}
+        {state && !state.ok && <ErrorText>{state.error}</ErrorText>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-        >
+        <Button type="submit" disabled={pending} className="self-start">
           {pending ? "Saving..." : "Add rule"}
-        </button>
+        </Button>
       </form>
     </section>
   );

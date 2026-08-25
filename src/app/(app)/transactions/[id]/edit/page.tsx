@@ -5,6 +5,7 @@ import { accounts, transactions } from "@/db/schema";
 import { requireMembership } from "@/lib/session";
 import { listCategories, listVisibleAccounts } from "@/lib/queries";
 import { TransactionForm } from "@/components/transaction-form";
+import { PageHeader } from "@/components/ui";
 
 export default async function EditTransactionPage({
   params,
@@ -38,24 +39,26 @@ export default async function EditTransactionPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <h1 className="text-xl font-semibold tracking-tight">Edit transaction</h1>
-      <TransactionForm
-        accounts={formAccounts}
-        categories={categories}
-        transaction={{
-          id: existing.id,
-          type: existing.type,
-          amount: existing.amount,
-          date: existing.date,
-          categoryId: existing.categoryId,
-          payee: existing.payee,
-          notes: existing.notes,
-          visibility: existing.visibility,
-          accountId: existing.accountId,
-          accountName: account?.name ?? "",
-          currency,
-        }}
-      />
+      <PageHeader title="Edit transaction" />
+      <div className="mx-auto w-full max-w-lg">
+        <TransactionForm
+          accounts={formAccounts}
+          categories={categories}
+          transaction={{
+            id: existing.id,
+            type: existing.type,
+            amount: existing.amount,
+            date: existing.date,
+            categoryId: existing.categoryId,
+            payee: existing.payee,
+            notes: existing.notes,
+            visibility: existing.visibility,
+            accountId: existing.accountId,
+            accountName: account?.name ?? "",
+            currency,
+          }}
+        />
+      </div>
     </div>
   );
 }

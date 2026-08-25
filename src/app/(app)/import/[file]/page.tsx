@@ -16,10 +16,7 @@ export default async function ImportStatementPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <Link
-        href="/import"
-        className="self-start text-sm text-black/60 hover:underline dark:text-white/60"
-      >
+      <Link href="/import" className="self-start text-sm text-muted hover:text-foreground hover:underline">
         ← Imports
       </Link>
       <ImportPreview preview={preview} />

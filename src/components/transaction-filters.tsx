@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 
+// Compact variant of ui.tsx's selectClass: same tokens, but auto-width so
+// filters sit side by side in a wrapping toolbar instead of stacking full-width.
+const filterSelectClass =
+  "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-ring";
+
 interface AccountOption {
   id: string;
   name: string;
@@ -37,9 +42,6 @@ const TYPE_OPTIONS = [
   { value: "income", label: "Income" },
   { value: "transfer", label: "Transfer" },
 ];
-
-const selectClass =
-  "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30";
 
 export function TransactionFilters({
   accounts,
@@ -84,12 +86,12 @@ export function TransactionFilters({
   }
 
   return (
-    <div className="flex flex-wrap gap-2 rounded-lg border border-black/10 p-3 dark:border-white/15">
+    <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-surface p-3">
       <select
         aria-label="Account"
         value={account ?? ""}
         onChange={(e) => updateParam("account", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       >
         <option value="">All accounts</option>
         {accounts.map((a) => (
@@ -103,7 +105,7 @@ export function TransactionFilters({
         aria-label="Category"
         value={category ?? ""}
         onChange={(e) => updateParam("category", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       >
         <option value="">All categories</option>
         {parents.map((p) => {
@@ -133,7 +135,7 @@ export function TransactionFilters({
         aria-label="Person"
         value={person ?? ""}
         onChange={(e) => updateParam("person", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       >
         <option value="">Everyone</option>
         {members.map((m) => (
@@ -147,7 +149,7 @@ export function TransactionFilters({
         aria-label="Type"
         value={type ?? ""}
         onChange={(e) => updateParam("type", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       >
         <option value="">All types</option>
         {TYPE_OPTIONS.map((t) => (
@@ -162,14 +164,14 @@ export function TransactionFilters({
         type="date"
         value={from ?? ""}
         onChange={(e) => updateParam("from", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       />
       <input
         aria-label="To date"
         type="date"
         value={to ?? ""}
         onChange={(e) => updateParam("to", e.target.value)}
-        className={selectClass}
+        className={filterSelectClass}
       />
     </div>
   );

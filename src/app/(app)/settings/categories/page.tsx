@@ -6,22 +6,20 @@ import {
   listVisibleAccounts,
 } from "@/lib/queries";
 import { CategoryRulesPanel } from "@/components/category-rules-panel";
+import { Badge, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 
 type Category = Awaited<ReturnType<typeof listCategories>>[number];
 
 function CategoryLink({ category }: { category: Category }) {
   return (
-    <Link
-      href={`/settings/categories/${category.id}/edit`}
-      className="flex items-center justify-between gap-3 rounded-lg border border-black/10 p-3 text-sm transition hover:border-black/20 dark:border-white/15 dark:hover:border-white/30"
-    >
-      <div className="flex items-center gap-2">
-        <span>{category.icon ?? "❓"}</span>
-        <span className="font-medium">{category.name}</span>
-      </div>
-      <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
-        {category.scope}
-      </span>
+    <Link href={`/settings/categories/${category.id}/edit`} className="block">
+      <Card className="flex items-center justify-between gap-3 p-3 transition-colors hover:border-border-strong">
+        <div className="flex items-center gap-2">
+          <span>{category.icon ?? "❓"}</span>
+          <span className="font-medium">{category.name}</span>
+        </div>
+        <Badge>{category.scope}</Badge>
+      </Card>
     </Link>
   );
 }
@@ -56,20 +54,17 @@ export default async function CategoriesSettingsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Categories</h1>
-        <Link
-          href="/settings/categories/new"
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
-        >
-          New category
-        </Link>
-      </div>
+      <PageHeader
+        title="Categories"
+        actions={<ButtonLink href="/settings/categories/new">New category</ButtonLink>}
+      />
 
       {parents.length === 0 ? (
-        <p className="text-sm text-black/60 dark:text-white/60">
-          No categories yet. Create one to start organizing transactions.
-        </p>
+        <EmptyState
+          title="No categories yet"
+          description="Create one to start organizing transactions."
+          action={<ButtonLink href="/settings/categories/new">New category</ButtonLink>}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {parents.map((parent) => {
@@ -86,7 +81,7 @@ export default async function CategoriesSettingsPage() {
                 )}
                 <Link
                   href={`/settings/categories/new?parentId=${parent.id}`}
-                  className="ml-6 self-start text-xs text-black/50 hover:underline dark:text-white/50"
+                  className="ml-6 self-start text-xs text-muted hover:underline"
                 >
                   + Add subcategory
                 </Link>

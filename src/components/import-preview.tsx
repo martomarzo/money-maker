@@ -2,9 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useActionState } from "react";
-import Link from "next/link";
 import { commitStatement, type StatementPreview } from "@/lib/actions/import";
 import { formatCents } from "@/lib/domain/money";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardTitle,
+  ErrorText,
+  inputClass,
+  labelClass,
+  selectClass,
+} from "@/components/ui";
 
 type AccountType = "checking" | "savings" | "cash" | "credit_card";
 
@@ -25,10 +35,6 @@ const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: "cash", label: "Cash" },
   { value: "credit_card", label: "Credit card" },
 ];
-
-const inputClass =
-  "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30";
-const badgeClass = "rounded-full px-2 py-0.5 text-xs font-medium";
 
 const MAX_RENDERED_ROWS = 300;
 const NEW_ACCOUNT_VALUE = "__new__";
@@ -103,9 +109,9 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
 
   if (state?.ok) {
     return (
-      <div className="flex flex-col gap-4 rounded-lg border border-black/10 p-6 dark:border-white/15">
+      <Card className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">Import complete</h2>
-        <ul className="flex flex-col gap-1 text-sm text-black/70 dark:text-white/70">
+        <ul className="flex flex-col gap-1 text-sm text-muted">
           <li>{state.importedCount} transactions imported</li>
           <li>{state.skippedDuplicateCount} skipped as duplicates</li>
           <li>{state.skippedFilteredCount} excluded</li>
@@ -117,13 +123,10 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
             </li>
           )}
         </ul>
-        <Link
-          href="/import"
-          className="self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
-        >
+        <ButtonLink href="/import" size="sm" className="self-start">
           Back to imports
-        </Link>
-      </div>
+        </ButtonLink>
+      </Card>
     );
   }
 
@@ -134,36 +137,36 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
       <input type="hidden" name="excludedIndices" value={excludedIndicesJson} />
       <input type="hidden" name="categoryOverrides" value={categoryOverridesJson} />
 
-      <div className="flex flex-col gap-1 rounded-lg border border-black/10 p-4 dark:border-white/15">
+      <Card className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">{preview.filename}</h1>
-            <p className="text-xs text-black/50 dark:text-white/50">
+            <p className="text-xs text-faint">
               {preview.source} · {preview.sourceFile}
             </p>
           </div>
-          <span className="text-xs text-black/50 dark:text-white/50">
+          <span className="text-xs text-faint">
             {preview.dateFrom} – {preview.dateTo}
           </span>
         </div>
         {preview.warnings.length > 0 && (
-          <ul className="mt-2 list-inside list-disc text-xs text-amber-700 dark:text-amber-400">
+          <ul className="mt-2 list-inside list-disc text-xs text-warning">
             {preview.warnings.map((w, i) => (
               <li key={i}>{w}</li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">Account mapping</h2>
+      <Card className="flex flex-col gap-3">
+        <CardTitle>Account mapping</CardTitle>
         {preview.currencies.map((currency) => {
           const choice = accountChoices[currency];
           const options = preview.existingAccountsByCurrency[currency] ?? [];
           return (
             <div key={currency} className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex flex-1 flex-col gap-1">
-                <label className="text-sm font-medium">{currency}</label>
+                <label className={labelClass}>{currency}</label>
                 <select
                   value={choice.mode === "existing" ? choice.accountId : NEW_ACCOUNT_VALUE}
                   onChange={(e) => {
@@ -186,7 +189,7 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
                       };
                     });
                   }}
-                  className={inputClass}
+                  className={selectClass}
                 >
                   {options.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -199,7 +202,7 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
               {choice.mode === "new" && (
                 <>
                   <div className="flex flex-1 flex-col gap-1">
-                    <label className="text-sm font-medium">Name</label>
+                    <label className={labelClass}>Name</label>
                     <input
                       type="text"
                       value={choice.name}
@@ -213,7 +216,7 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium">Type</label>
+                    <label className={labelClass}>Type</label>
                     <select
                       value={choice.type}
                       onChange={(e) =>
@@ -226,7 +229,7 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
                           },
                         }))
                       }
-                      className={inputClass}
+                      className={selectClass}
                     >
                       {ACCOUNT_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>
@@ -240,36 +243,22 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
             </div>
           );
         })}
-      </div>
+      </Card>
 
       <div className="flex flex-wrap gap-2">
-        <span className={`${badgeClass} bg-red-500/10 text-red-700 dark:text-red-400`}>
-          {preview.summary.expenseCount} expense
-        </span>
-        <span className={`${badgeClass} bg-green-500/10 text-green-700 dark:text-green-400`}>
-          {preview.summary.incomeCount} income
-        </span>
-        <span className={`${badgeClass} bg-black/5 dark:bg-white/10`}>
-          {preview.summary.transferCount} transfer
-        </span>
-        <span className={`${badgeClass} bg-black/5 dark:bg-white/10`}>
-          {preview.summary.alreadyImportedCount} already imported
-        </span>
-        <span className={`${badgeClass} bg-amber-500/10 text-amber-700 dark:text-amber-400`}>
-          {preview.summary.inBatchDuplicateCount} in-file duplicates
-        </span>
-        <span className={`${badgeClass} bg-black/5 dark:bg-white/10`}>
-          {preview.summary.transferMatchedPairs} transfer pairs matched
-        </span>
-        <span className={`${badgeClass} bg-black/5 dark:bg-white/10`}>
-          {preview.summary.suggestedCategoryCount} categorized
-        </span>
+        <Badge tone="expense">{preview.summary.expenseCount} expense</Badge>
+        <Badge tone="income">{preview.summary.incomeCount} income</Badge>
+        <Badge>{preview.summary.transferCount} transfer</Badge>
+        <Badge>{preview.summary.alreadyImportedCount} already imported</Badge>
+        <Badge tone="warning">{preview.summary.inBatchDuplicateCount} in-file duplicates</Badge>
+        <Badge>{preview.summary.transferMatchedPairs} transfer pairs matched</Badge>
+        <Badge>{preview.summary.suggestedCategoryCount} categorized</Badge>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/15">
+      <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-black/10 text-left text-xs text-black/50 dark:border-white/15 dark:text-white/50">
+          <thead className="sticky top-0 z-10 bg-surface-muted">
+            <tr className="border-b border-border text-left text-xs text-muted">
               <th className="p-2">Include</th>
               <th className="p-2">Date</th>
               <th className="p-2">Payee</th>
@@ -283,49 +272,30 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
             {visibleDrafts.map((draft) => {
               const isChecked = !excluded.has(draft.index);
               return (
-                <tr
-                  key={draft.index}
-                  className="border-b border-black/5 last:border-0 dark:border-white/10"
-                >
+                <tr key={draft.index} className="border-b border-border last:border-0">
                   <td className="p-2">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       disabled={draft.alreadyImported}
                       onChange={() => toggleIncluded(draft.index, draft.alreadyImported)}
-                      className="h-4 w-4 rounded border-black/20 dark:border-white/25"
+                      className="h-4 w-4 rounded border-border-strong"
                     />
                   </td>
                   <td className="p-2 whitespace-nowrap">{draft.date}</td>
                   <td className="p-2">{draft.payee}</td>
-                  <td className="p-2 whitespace-nowrap tabular-nums">
-                    {formatSignedAmount(draft)}
-                  </td>
+                  <td className="tnum p-2 whitespace-nowrap">{formatSignedAmount(draft)}</td>
                   <td className="p-2">
-                    <span className={`${badgeClass} bg-black/5 dark:bg-white/10`}>
-                      {draft.kind}
-                    </span>
+                    <Badge>{draft.kind}</Badge>
                   </td>
                   <td className="p-2">
                     <div className="flex flex-wrap gap-1">
-                      {draft.alreadyImported && (
-                        <span className={`${badgeClass} bg-black/10 dark:bg-white/15`}>
-                          already imported
-                        </span>
-                      )}
+                      {draft.alreadyImported && <Badge>already imported</Badge>}
                       {draft.inBatchDuplicate && !draft.alreadyImported && (
-                        <span
-                          className={`${badgeClass} bg-amber-500/10 text-amber-700 dark:text-amber-400`}
-                        >
-                          duplicate in file
-                        </span>
+                        <Badge tone="warning">duplicate in file</Badge>
                       )}
                       {draft.transferMatchIndex != null && (
-                        <span
-                          className={`${badgeClass} bg-blue-500/10 text-blue-700 dark:text-blue-400`}
-                        >
-                          ↔ row {draft.transferMatchIndex}
-                        </span>
+                        <Badge tone="accent">↔ row {draft.transferMatchIndex}</Badge>
                       )}
                     </div>
                   </td>
@@ -338,7 +308,7 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
                           [draft.index]: e.target.value,
                         }))
                       }
-                      className={`${inputClass} min-w-[10rem]`}
+                      className={`${selectClass} min-w-[10rem]`}
                     >
                       <option value="">Uncategorized</option>
                       {parents.map((p) => {
@@ -370,30 +340,19 @@ export function ImportPreview({ preview }: { preview: StatementPreview }) {
           </tbody>
         </table>
         {hiddenCount > 0 && (
-          <p className="p-3 text-xs text-black/50 dark:text-white/50">
-            … and {hiddenCount} more included on commit.
-          </p>
+          <p className="p-3 text-xs text-faint">… and {hiddenCount} more included on commit.</p>
         )}
       </div>
 
-      {state && !state.ok && (
-        <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-      )}
+      {state && !state.ok && <ErrorText>{state.error}</ErrorText>}
 
       <div className="flex gap-2">
-        <Link
-          href="/import"
-          className="rounded-md border border-black/10 px-4 py-2 text-sm font-medium dark:border-white/15"
-        >
+        <ButtonLink href="/import" variant="secondary">
           Cancel
-        </Link>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-        >
+        </ButtonLink>
+        <Button type="submit" disabled={pending}>
           {pending ? "Importing..." : "Commit import"}
-        </button>
+        </Button>
       </div>
     </form>
   );

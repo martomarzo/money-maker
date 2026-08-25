@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import type { accounts } from "@/db/schema";
 import { createAccount, updateAccount, setAccountArchived } from "@/lib/actions/accounts";
+import { Button, ErrorText, inputClass, labelClass, selectClass } from "@/components/ui";
 
 type Account = typeof accounts.$inferSelect;
 
@@ -21,9 +22,6 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 const CURRENCIES = ["EUR", "USD", "ARS", "PYG"] as const;
-
-const inputClass =
-  "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30";
 
 export function AccountForm({ account }: { account?: AccountFormAccount }) {
   const router = useRouter();
@@ -62,7 +60,7 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
         {account && <input type="hidden" name="currency" value={account.currency} />}
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="name" className="text-sm font-medium">
+          <label htmlFor="name" className={labelClass}>
             Name
           </label>
           <input
@@ -76,14 +74,14 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="type" className="text-sm font-medium">
+          <label htmlFor="type" className={labelClass}>
             Type
           </label>
           <select
             id="type"
             name="type"
             defaultValue={account?.type ?? "checking"}
-            className={inputClass}
+            className={selectClass}
           >
             {ACCOUNT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
@@ -94,13 +92,11 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium">Currency</label>
+          <label className={labelClass}>Currency</label>
           {account ? (
-            <p className={`${inputClass} text-black/70 dark:text-white/70`}>
-              {account.currency}
-            </p>
+            <p className={`${inputClass} text-muted`}>{account.currency}</p>
           ) : (
-            <select id="currency" name="currency" defaultValue="EUR" className={inputClass}>
+            <select id="currency" name="currency" defaultValue="EUR" className={selectClass}>
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -111,9 +107,8 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="country" className="text-sm font-medium">
-            Country{" "}
-            <span className="text-black/40 dark:text-white/40">(optional)</span>
+          <label htmlFor="country" className={labelClass}>
+            Country <span className="text-faint">(optional)</span>
           </label>
           <input
             id="country"
@@ -127,7 +122,7 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="initialBalance" className="text-sm font-medium">
+          <label htmlFor="initialBalance" className={labelClass}>
             Initial balance
           </label>
           <input
@@ -136,7 +131,7 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
             type="text"
             inputMode="decimal"
             defaultValue={account?.initialBalance ?? "0"}
-            className={inputClass}
+            className={`${inputClass} tnum`}
           />
         </div>
 
@@ -145,41 +140,35 @@ export function AccountForm({ account }: { account?: AccountFormAccount }) {
             type="checkbox"
             name="personal"
             defaultChecked={Boolean(account?.ownerUserId)}
-            className="h-4 w-4 rounded border-black/20 dark:border-white/25"
+            className="h-4 w-4 rounded border-border"
           />
           Personal account — only visible to me
         </label>
 
-        {state && !state.ok && (
-          <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-        )}
+        {state && !state.ok && <ErrorText>{state.error}</ErrorText>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-        >
+        <Button type="submit" disabled={pending} className="mt-2">
           {pending ? "Saving..." : isEdit ? "Save changes" : "Create account"}
-        </button>
+        </Button>
       </form>
 
       {account && (
-        <div className="flex flex-col gap-2 border-t border-black/10 pt-4 dark:border-white/15">
-          {archiveError && (
-            <p className="text-sm text-red-600 dark:text-red-400">{archiveError}</p>
-          )}
-          <button
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          {archiveError && <ErrorText>{archiveError}</ErrorText>}
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleArchiveToggle}
             disabled={isArchivePending}
-            className="self-start rounded-md border border-black/10 px-3 py-1.5 text-xs font-medium disabled:opacity-60 dark:border-white/15"
+            className="self-start"
           >
             {isArchivePending
               ? "Saving..."
               : account.archived
                 ? "Unarchive account"
                 : "Archive account"}
-          </button>
+          </Button>
         </div>
       )}
     </div>

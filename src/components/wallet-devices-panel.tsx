@@ -7,6 +7,7 @@ import {
   revokeWalletDevice,
   type CreateDeviceResult,
 } from "@/lib/actions/wallet";
+import { Badge, Button, CardTitle, ErrorText, inputClass } from "@/components/ui";
 
 type Device = {
   id: string;
@@ -45,33 +46,27 @@ export function WalletDevicesPanel({
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide opacity-70">
-          Add device
-        </h2>
+        <CardTitle>Add device</CardTitle>
         <form action={formAction} className="flex flex-wrap items-center gap-2">
           <input
             name="name"
             placeholder="e.g. Martin's Pixel"
             required
             maxLength={60}
-            className="rounded-lg border border-black/10 bg-transparent px-3 py-1.5 text-sm dark:border-white/15"
+            className={`${inputClass} w-auto`}
           />
-          <button
-            disabled={pending}
-            className="rounded-lg border border-black/10 px-3 py-1.5 text-sm font-medium transition hover:border-black/20 disabled:opacity-50 dark:border-white/15 dark:hover:border-white/30"
-          >
+          <Button type="submit" variant="secondary" size="sm" disabled={pending}>
             Create token
-          </button>
+          </Button>
         </form>
-        {result && !result.ok && (
-          <p className="text-sm text-red-600 dark:text-red-400">{result.error}</p>
-        )}
+        <ErrorText>{result && !result.ok ? result.error : null}</ErrorText>
         {result?.ok && result.token && (
-          <div className="rounded-lg border border-black/10 p-3 text-sm dark:border-white/15">
+          <div className="rounded-xl border border-border bg-surface p-3 text-sm">
             <p className="font-medium">
-              Token for “{result.deviceName}” — copy it now, it won&apos;t be shown again:
+              Token for &ldquo;{result.deviceName}&rdquo; — copy it now, it won&apos;t be shown
+              again:
             </p>
-            <code className="mt-1 block break-all rounded bg-black/5 p-2 text-xs dark:bg-white/10">
+            <code className="mt-1 block break-all rounded bg-surface-muted p-2 text-xs">
               {result.token}
             </code>
           </div>
@@ -79,31 +74,30 @@ export function WalletDevicesPanel({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide opacity-70">
-          Devices
-        </h2>
-        {devices.length === 0 && <p className="text-sm opacity-70">No devices yet.</p>}
+        <CardTitle>Devices</CardTitle>
+        {devices.length === 0 && <p className="text-sm text-muted">No devices yet.</p>}
         <ul className="flex flex-col gap-2">
           {devices.map((d) => (
             <li
               key={d.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-black/10 p-3 text-sm dark:border-white/15"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
             >
               <div>
                 <span className="font-medium">{d.name}</span>
-                <span className="ml-2 text-xs opacity-60">
+                <span className="ml-2 text-xs text-faint">
                   added {d.createdAt}
                   {d.lastSeenAt ? ` · last seen ${d.lastSeenAt}` : " · never used"}
                 </span>
               </div>
               {d.revoked ? (
-                <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
-                  revoked
-                </span>
+                <Badge>revoked</Badge>
               ) : (
                 <form action={revokeDeviceAction}>
                   <input type="hidden" name="id" value={d.id} />
-                  <button className="text-xs text-red-600 underline-offset-2 hover:underline dark:text-red-400">
+                  <button
+                    type="submit"
+                    className="text-xs text-danger underline-offset-2 hover:underline"
+                  >
                     Revoke
                   </button>
                 </form>
@@ -114,29 +108,28 @@ export function WalletDevicesPanel({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide opacity-70">
-          Card mappings
-        </h2>
-        <p className="text-xs opacity-60">
-          Created from the Wallet inbox (“remember card”). Delete one to
-          re-teach it on the next capture.
+        <CardTitle>Card mappings</CardTitle>
+        <p className="text-xs text-faint">
+          Created from the Wallet inbox (&ldquo;remember card&rdquo;). Delete one to re-teach it
+          on the next capture.
         </p>
-        {mappings.length === 0 && <p className="text-sm opacity-70">No mappings yet.</p>}
+        {mappings.length === 0 && <p className="text-sm text-muted">No mappings yet.</p>}
         <ul className="flex flex-col gap-2">
           {mappings.map((m) => (
             <li
               key={m.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-black/10 p-3 text-sm dark:border-white/15"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
             >
               <span>
-                <code className="rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">
-                  {m.cardKey}
-                </code>{" "}
+                <code className="rounded bg-surface-muted px-1.5 py-0.5 text-xs">{m.cardKey}</code>{" "}
                 → {m.accountName}
               </span>
               <form action={deleteMappingAction}>
                 <input type="hidden" name="id" value={m.id} />
-                <button className="text-xs text-red-600 underline-offset-2 hover:underline dark:text-red-400">
+                <button
+                  type="submit"
+                  className="text-xs text-danger underline-offset-2 hover:underline"
+                >
                   Delete
                 </button>
               </form>

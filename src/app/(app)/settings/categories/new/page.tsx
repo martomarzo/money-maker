@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { requireMembership } from "@/lib/session";
 import { listCategories } from "@/lib/queries";
 import { CategoryForm } from "@/components/category-form";
+import { ButtonLink, PageHeader } from "@/components/ui";
 
 export default async function NewCategoryPage({
   searchParams,
@@ -17,14 +17,11 @@ export default async function NewCategoryPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <Link
-        href="/settings/categories"
-        className="self-start text-sm text-black/60 hover:underline dark:text-white/60"
-      >
+      <ButtonLink href="/settings/categories" variant="ghost" size="sm" className="self-start">
         ← Categories
-      </Link>
-      <h1 className="text-xl font-semibold tracking-tight">New category</h1>
-      <div className="max-w-sm">
+      </ButtonLink>
+      <PageHeader title="New category" />
+      <div className="mx-auto w-full max-w-lg">
         <CategoryForm parentOptions={parentOptions} initialParentId={parentId} />
       </div>
     </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
@@ -6,6 +5,7 @@ import { categories } from "@/db/schema";
 import { requireMembership } from "@/lib/session";
 import { listCategories } from "@/lib/queries";
 import { CategoryForm } from "@/components/category-form";
+import { ButtonLink, PageHeader } from "@/components/ui";
 
 export default async function EditCategoryPage({
   params,
@@ -31,14 +31,11 @@ export default async function EditCategoryPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <Link
-        href="/settings/categories"
-        className="self-start text-sm text-black/60 hover:underline dark:text-white/60"
-      >
+      <ButtonLink href="/settings/categories" variant="ghost" size="sm" className="self-start">
         ← Categories
-      </Link>
-      <h1 className="text-xl font-semibold tracking-tight">Edit category</h1>
-      <div className="max-w-sm">
+      </ButtonLink>
+      <PageHeader title="Edit category" />
+      <div className="mx-auto w-full max-w-lg">
         <CategoryForm
           category={{
             id: category.id,

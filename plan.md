@@ -192,7 +192,7 @@ Decision: with real history imported, the dashboard and budgets deliver more val
 
 Import-review follow-ups from first real use land here too (e.g. "needs review"/uncategorized filter in the transactions list).
 
-### Phase 1.7 — Wallet capture (built & deployed 2026-08-19 — field-testing)
+### Phase 1.7 — Wallet capture (built 2026-08-19 — SUPERSEDED 2026-08-25, kept as experimental)
 
 Card payments auto-land in the app seconds after the tap. No native apps:
 Android forwards Google Wallet/bank notifications via a MacroDroid macro;
@@ -210,7 +210,48 @@ ingest; parse failures land in the inbox, never as wrong transactions).
 No reconciliation with statement imports — those were a one-time backfill.
 **Full spec: `docs/superpowers/specs/2026-08-19-wallet-capture-design.md`.** Setup guides at `docs/wallet-android-setup.md` / `docs/wallet-ios-setup.md`.
 
-Status: deployed live 2026-08-19 (endpoint verified: 401 unauthenticated, /wallet gated). User is field-testing with real taps; feedback drives the next iteration. Parked parser follow-ups for that pass: `\b` guards on alphabetic currency tokens (ARS/USD/Gs), zero-decimal fraction guard ("12.50" on a PYG card should hold, not book ₲1,250), widen minute regex if MacroDroid's `{minute}` proves unpadded, surface `{ok:false}` action errors in the inbox/devices UIs, dedupe repeated "always" rules.
+Status: deployed 2026-08-19, but the first real taps **did not arrive** and the
+user does not want to depend on configuring a third-party phone automation
+(MacroDroid / Shortcuts). Decision 2026-08-25: the endpoint, `/wallet` inbox and
+`/settings/devices` stay in the codebase as an *experimental* path (unlinked
+from the main nav, labelled as such in-page); no further parser work is
+planned. Capture now happens **natively in the app** — see Phase 1.8.
+
+### Phase 1.8 — Native quick capture (started 2026-08-25, priority #1)
+
+Logging an expense must be the fastest thing the app does, with nothing to
+configure outside it. Technical reality: a web app cannot read Google Wallet /
+bank notifications, so "native" here means the app itself is the capture
+surface — one tap from the home screen, one screen to fill, done.
+
+- **Dashboard = capture hub (done 2026-08-25):** `/` opens on a hero with
+  **Add expense** as the primary action (plus Add income / Transfer), then
+  account balances and the latest transactions. `/transactions/new?type=…`
+  preselects the mode. A floating `+` button sits in the mobile tab bar on
+  every page and an `Add` button in the desktop header.
+- **Installable (done 2026-08-25):** `src/app/manifest.ts` + generated icons
+  (`src/app/icon.svg`, `apple-icon.png`, `favicon.ico`, `public/icons/*`),
+  theme-color, standalone display — "Add to Home Screen" gives an app icon
+  that opens straight onto the capture hub.
+- **Next:** a dedicated one-handed quick-add screen (amount keypad → category
+  grid → account chip → save; defaults remembered per device) — this is the
+  Phase 2 "Quick add" screen pulled forward; then offline queueing in Phase 2
+  makes it work without signal.
+- **Later, optional:** if true auto-capture is ever wanted, the only path
+  that needs no third-party config is a small native Android companion app
+  (NotificationListenerService) posting to the existing
+  `POST /api/wallet/capture` endpoint — which is why that endpoint stays.
+
+### Visual pass (2026-08-25)
+
+Design tokens live in `src/app/globals.css` (Tailwind v4 `@theme`: warm
+neutral surfaces, teal accent, semantic `income`/`expense`/`warning`/`danger`,
+light + dark). Shared primitives in `src/components/ui.tsx` (`Button`,
+`ButtonLink`, `Card`, `PageHeader`, `Badge`, `EmptyState`, `ErrorText`,
+`inputClass`/`labelClass`). App shell in `src/components/app-shell.tsx`:
+sticky header with logo mark, desktop nav, mobile bottom tab bar
+(Home / Transactions / + / Accounts / Settings). Every page uses the
+primitives; no raw `black/white` opacity classes remain.
 
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.

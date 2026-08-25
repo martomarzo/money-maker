@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
 import { requireMembership } from "@/lib/session";
 import { AccountForm } from "@/components/account-form";
+import { ButtonLink, PageHeader } from "@/components/ui";
 
 export default async function EditAccountPage({
   params,
@@ -25,14 +25,11 @@ export default async function EditAccountPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <Link
-        href="/accounts"
-        className="self-start text-sm text-black/60 hover:underline dark:text-white/60"
-      >
+      <ButtonLink href="/accounts" variant="ghost" size="sm" className="self-start">
         ← Accounts
-      </Link>
-      <h1 className="text-xl font-semibold tracking-tight">Edit account</h1>
-      <div className="max-w-sm">
+      </ButtonLink>
+      <PageHeader title="Edit account" />
+      <div className="mx-auto w-full max-w-lg">
         <AccountForm
           account={{
             id: account.id,

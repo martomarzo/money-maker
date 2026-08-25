@@ -9,6 +9,7 @@ import {
   deleteTransaction,
   updateTransaction,
 } from "@/lib/actions/transactions";
+import { Button, ErrorText, inputClass, labelClass } from "@/components/ui";
 
 interface AccountOption {
   id: string;
@@ -41,17 +42,23 @@ interface TransactionFormProps {
   accounts: AccountOption[];
   categories: CategoryOption[];
   transaction?: EditableTransaction;
+  defaultMode?: Mode;
 }
 
 type Mode = "expense" | "income" | "transfer";
 
-const inputClass =
-  "rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30";
+const amountInputClass =
+  "w-full rounded-lg border border-border bg-surface px-3 py-3 text-3xl font-semibold tabular-nums text-foreground outline-none transition-colors placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-ring disabled:opacity-60";
 
-export function TransactionForm({ accounts, categories, transaction }: TransactionFormProps) {
+export function TransactionForm({
+  accounts,
+  categories,
+  transaction,
+  defaultMode,
+}: TransactionFormProps) {
   const router = useRouter();
   const isEdit = Boolean(transaction);
-  const [mode, setMode] = useState<Mode>(transaction?.type ?? "expense");
+  const [mode, setMode] = useState<Mode>(transaction?.type ?? defaultMode ?? "expense");
 
   const [entryState, entryAction, entryPending] = useActionState(
     isEdit ? updateTransaction : createTransaction,
@@ -124,16 +131,16 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
   return (
     <div className="flex flex-col gap-6">
       {modeOptions.length > 1 && (
-        <div className="flex rounded-md border border-black/10 p-1 text-sm dark:border-white/15">
+        <div className="flex rounded-lg border border-border bg-surface-muted p-1 text-sm">
           {modeOptions.map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`flex-1 rounded px-3 py-1.5 font-medium capitalize transition-colors ${
+              className={`flex-1 rounded-md px-3 py-1.5 font-medium capitalize transition-colors ${
                 mode === m
-                  ? "bg-foreground text-background"
-                  : "text-black/60 dark:text-white/60"
+                  ? "bg-accent text-on-accent"
+                  : "text-muted hover:text-foreground"
               }`}
             >
               {m}
@@ -145,7 +152,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
       {mode === "transfer" ? (
         <form action={transferAction} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="amount" className="text-sm font-medium">
+            <label htmlFor="amount" className={labelClass}>
               Amount
             </label>
             <input
@@ -155,12 +162,12 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
               inputMode="decimal"
               autoFocus
               required
-              className={`${inputClass} text-2xl`}
+              className={amountInputClass}
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="fromAccountId" className="text-sm font-medium">
+            <label htmlFor="fromAccountId" className={labelClass}>
               From account
             </label>
             <select
@@ -180,7 +187,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="toAccountId" className="text-sm font-medium">
+            <label htmlFor="toAccountId" className={labelClass}>
               To account
             </label>
             <select
@@ -201,7 +208,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
 
           {showToAmount && (
             <div className="flex flex-col gap-1">
-              <label htmlFor="toAmount" className="text-sm font-medium">
+              <label htmlFor="toAmount" className={labelClass}>
                 Received amount
               </label>
               <input
@@ -210,13 +217,13 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
                 type="text"
                 inputMode="decimal"
                 required
-                className={inputClass}
+                className={`${inputClass} tnum`}
               />
             </div>
           )}
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="date" className="text-sm font-medium">
+            <label htmlFor="date" className={labelClass}>
               Date
             </label>
             <input
@@ -230,23 +237,17 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="notes" className="text-sm font-medium">
+            <label htmlFor="notes" className={labelClass}>
               Notes
             </label>
             <textarea id="notes" name="notes" rows={2} className={inputClass} />
           </div>
 
-          {transferState && !transferState.ok && (
-            <p className="text-sm text-red-600 dark:text-red-400">{transferState.error}</p>
-          )}
+          {transferState && !transferState.ok && <ErrorText>{transferState.error}</ErrorText>}
 
-          <button
-            type="submit"
-            disabled={transferPending}
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-          >
+          <Button type="submit" disabled={transferPending} className="w-full sm:w-auto">
             {transferPending ? "Saving..." : "Save transfer"}
-          </button>
+          </Button>
         </form>
       ) : (
         <form action={entryAction} className="flex flex-col gap-4">
@@ -254,7 +255,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           <input type="hidden" name="type" value={mode} />
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="amount" className="text-sm font-medium">
+            <label htmlFor="amount" className={labelClass}>
               Amount
             </label>
             <input
@@ -265,20 +266,20 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
               autoFocus
               required
               defaultValue={transaction?.amount}
-              className={`${inputClass} text-2xl`}
+              className={amountInputClass}
             />
           </div>
 
           {isEdit ? (
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Account</span>
-              <p className="rounded-md border border-black/10 bg-black/5 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5">
+              <span className={labelClass}>Account</span>
+              <p className="rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-foreground">
                 {transaction!.accountName} ({transaction!.currency})
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              <label htmlFor="accountId" className="text-sm font-medium">
+              <label htmlFor="accountId" className={labelClass}>
                 Account
               </label>
               <select
@@ -298,7 +299,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           )}
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="date" className="text-sm font-medium">
+            <label htmlFor="date" className={labelClass}>
               Date
             </label>
             <input
@@ -313,7 +314,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="categoryId" className="text-sm font-medium">
+            <label htmlFor="categoryId" className={labelClass}>
               Category
             </label>
             <select
@@ -348,7 +349,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="payee" className="text-sm font-medium">
+            <label htmlFor="payee" className={labelClass}>
               Payee
             </label>
             <input
@@ -361,7 +362,7 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="notes" className="text-sm font-medium">
+            <label htmlFor="notes" className={labelClass}>
               Notes
             </label>
             <textarea
@@ -373,38 +374,33 @@ export function TransactionForm({ accounts, categories, transaction }: Transacti
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               name="visibility"
               value="personal"
               defaultChecked={transaction?.visibility === "personal"}
-              className="h-4 w-4 rounded border-black/20 dark:border-white/25"
+              className="h-4 w-4 rounded border-border text-accent focus:ring-2 focus:ring-ring"
             />
             Personal — hide from partner
           </label>
 
-          {entryState && !entryState.ok && (
-            <p className="text-sm text-red-600 dark:text-red-400">{entryState.error}</p>
-          )}
+          {entryState && !entryState.ok && <ErrorText>{entryState.error}</ErrorText>}
 
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={entryPending}
-              className="flex-1 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-            >
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="submit" disabled={entryPending} className="w-full sm:flex-1">
               {entryPending ? "Saving..." : isEdit ? "Save changes" : "Save"}
-            </button>
+            </Button>
             {isEdit && (
-              <button
+              <Button
                 type="button"
+                variant="danger"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="rounded-md border border-red-600/40 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-60 dark:border-red-400/40 dark:text-red-400"
+                className="w-full sm:w-auto"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
-              </button>
+              </Button>
             )}
           </div>
         </form>

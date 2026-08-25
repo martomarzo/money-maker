@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { register } from "@/lib/actions/auth";
+import { Button, ErrorText, inputClass, labelClass } from "@/components/ui";
 
 export default function RegisterPage() {
   const [state, formAction, pending] = useActionState(register, null);
@@ -10,7 +11,7 @@ export default function RegisterPage() {
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="displayName" className="text-sm font-medium">
+        <label htmlFor="displayName" className={labelClass}>
           Name
         </label>
         <input
@@ -19,12 +20,12 @@ export default function RegisterPage() {
           type="text"
           autoComplete="name"
           required
-          className="rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+          className={inputClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-sm font-medium">
+        <label htmlFor="email" className={labelClass}>
           Email
         </label>
         <input
@@ -33,12 +34,12 @@ export default function RegisterPage() {
           type="email"
           autoComplete="email"
           required
-          className="rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+          className={inputClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium">
+        <label htmlFor="password" className={labelClass}>
           Password
         </label>
         <input
@@ -48,25 +49,19 @@ export default function RegisterPage() {
           autoComplete="new-password"
           required
           minLength={8}
-          className="rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+          className={inputClass}
         />
       </div>
 
-      {state && !state.ok && (
-        <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>
-      )}
+      {state && !state.ok && <ErrorText>{state.error}</ErrorText>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-      >
+      <Button type="submit" disabled={pending} className="mt-2 w-full">
         {pending ? "Creating account..." : "Create account"}
-      </button>
+      </Button>
 
-      <p className="text-center text-sm text-black/60 dark:text-white/60">
+      <p className="text-center text-sm text-muted">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium underline">
+        <Link href="/login" className="font-medium text-foreground underline">
           Sign in
         </Link>
       </p>

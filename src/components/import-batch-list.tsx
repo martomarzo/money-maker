@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { matchUnlinkedTransfers, undoImportBatch } from "@/lib/actions/import";
+import { Button, ErrorText } from "@/components/ui";
 
 interface BatchRow {
   id: string;
@@ -64,48 +65,41 @@ export function ImportBatchList({ batches }: { batches: BatchRow[] }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">
-          Recent import batches
-        </h2>
-        <button
-          type="button"
-          onClick={handleMatch}
-          disabled={isMatching}
-          className="rounded-md border border-black/10 px-3 py-1.5 text-xs font-medium disabled:opacity-60 dark:border-white/15"
-        >
+        <h2 className="text-sm font-medium text-muted">Recent import batches</h2>
+        <Button type="button" variant="secondary" size="sm" onClick={handleMatch} disabled={isMatching}>
           {isMatching ? "Matching..." : "Match unlinked transfers"}
-        </button>
+        </Button>
       </div>
 
-      {matchResult && (
-        <p className="text-sm text-black/70 dark:text-white/70">{matchResult}</p>
-      )}
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {matchResult && <p className="text-sm text-muted">{matchResult}</p>}
+      <ErrorText>{error}</ErrorText>
 
       {batches.length === 0 ? (
-        <p className="text-sm text-black/50 dark:text-white/50">No imports committed yet.</p>
+        <p className="text-sm text-faint">No imports committed yet.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {batches.map((b) => (
             <div
               key={b.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-black/10 p-3 text-sm dark:border-white/15"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
             >
               <div className="flex flex-col gap-0.5">
                 <span className="font-medium">{b.filename}</span>
-                <span className="text-xs text-black/50 dark:text-white/50">
+                <span className="text-xs text-faint">
                   {b.source} · {formatDateTime(b.createdAt)} · {b.importedCount} imported,{" "}
                   {b.skippedDuplicateCount} duplicate, {b.skippedFilteredCount} excluded
                 </span>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={() => handleUndo(b.id)}
                 disabled={isUndoing && undoingId === b.id}
-                className="shrink-0 rounded-md border border-red-600/40 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-60 dark:border-red-400/40 dark:text-red-400"
+                className="shrink-0"
               >
                 {isUndoing && undoingId === b.id ? "Undoing..." : "Undo"}
-              </button>
+              </Button>
             </div>
           ))}
         </div>

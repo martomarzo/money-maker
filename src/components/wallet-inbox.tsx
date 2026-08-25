@@ -6,6 +6,7 @@ import {
 } from "@/lib/actions/wallet";
 import { formatCents } from "@/lib/domain/money";
 import type { listWalletCaptures } from "@/lib/queries";
+import { Badge, Button, EmptyState, selectClass } from "@/components/ui";
 
 type CaptureRow = Awaited<ReturnType<typeof listWalletCaptures>>[number];
 
@@ -69,10 +70,10 @@ export function WalletInbox({
 }) {
   if (captures.length === 0) {
     return (
-      <p className="rounded-lg border border-black/10 p-6 text-sm opacity-70 dark:border-white/15">
-        Nothing captured yet. Set up a device in Settings → Devices, then make
-        a card payment.
-      </p>
+      <EmptyState
+        title="Nothing captured yet"
+        description="Set up a device in Settings → Devices, then make a card payment."
+      />
     );
   }
 
@@ -81,29 +82,19 @@ export function WalletInbox({
       {captures.map((row) => (
         <li
           key={row.id}
-          className="flex flex-col gap-3 rounded-lg border border-black/10 p-4 text-sm dark:border-white/15"
+          className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 text-sm"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="font-medium">
-                {row.merchant ?? rawSummary(row)}
-              </span>
-              {amountLabel(row) && (
-                <span className="opacity-70">{amountLabel(row)}</span>
-              )}
+              <span className="font-medium">{row.merchant ?? rawSummary(row)}</span>
+              {amountLabel(row) && <span className="tnum text-muted">{amountLabel(row)}</span>}
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
-                {STATUS_LABEL[row.status]}
-              </span>
-              {row.status === "booked" && row.txnVisibility && (
-                <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
-                  {row.txnVisibility}
-                </span>
-              )}
+              <Badge>{STATUS_LABEL[row.status]}</Badge>
+              {row.status === "booked" && row.txnVisibility && <Badge>{row.txnVisibility}</Badge>}
             </div>
           </div>
-          <p className="text-xs opacity-60">
+          <p className="text-xs text-faint">
             {row.deviceName}
             {row.cardKey ? ` · card ${row.cardKey}` : ""} ·{" "}
             {row.createdAt.toISOString().slice(0, 16).replace("T", " ")}
@@ -114,9 +105,9 @@ export function WalletInbox({
               {row.txnVisibility === "personal" && (
                 <form action={shareAction}>
                   <input type="hidden" name="captureId" value={row.id} />
-                  <button className="rounded-lg border border-black/10 px-3 py-1.5 font-medium transition hover:border-black/20 dark:border-white/15 dark:hover:border-white/30">
+                  <Button type="submit" variant="secondary" size="sm">
                     Mark shared
-                  </button>
+                  </Button>
                 </form>
               )}
               <form action={recategorizeAction} className="flex flex-wrap items-center gap-2">
@@ -124,7 +115,7 @@ export function WalletInbox({
                 <select
                   name="categoryId"
                   defaultValue={row.txnCategoryId ?? ""}
-                  className="rounded-lg border border-black/10 bg-transparent px-2 py-1.5 dark:border-white/15"
+                  className={`${selectClass} w-auto`}
                 >
                   <option value="" disabled>
                     Category…
@@ -137,14 +128,14 @@ export function WalletInbox({
                   ))}
                 </select>
                 {row.merchant && (
-                  <label className="flex items-center gap-1 text-xs opacity-80">
+                  <label className="flex items-center gap-1 text-xs text-muted">
                     <input type="checkbox" name="always" />
-                    always for “{row.merchant}”
+                    always for &ldquo;{row.merchant}&rdquo;
                   </label>
                 )}
-                <button className="rounded-lg border border-black/10 px-3 py-1.5 font-medium transition hover:border-black/20 dark:border-white/15 dark:hover:border-white/30">
+                <Button type="submit" variant="secondary" size="sm">
                   Set category
-                </button>
+                </Button>
               </form>
             </div>
           )}
@@ -152,11 +143,7 @@ export function WalletInbox({
           {row.status === "needs_account" && (
             <form action={assignAccountAction} className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="captureId" value={row.id} />
-              <select
-                name="accountId"
-                defaultValue=""
-                className="rounded-lg border border-black/10 bg-transparent px-2 py-1.5 dark:border-white/15"
-              >
+              <select name="accountId" defaultValue="" className={`${selectClass} w-auto`}>
                 <option value="" disabled>
                   Account…
                 </option>
@@ -167,21 +154,24 @@ export function WalletInbox({
                 ))}
               </select>
               {row.cardKey && (
-                <label className="flex items-center gap-1 text-xs opacity-80">
+                <label className="flex items-center gap-1 text-xs text-muted">
                   <input type="checkbox" name="remember" defaultChecked />
                   remember card {row.cardKey}
                 </label>
               )}
-              <button className="rounded-lg border border-black/10 px-3 py-1.5 font-medium transition hover:border-black/20 dark:border-white/15 dark:hover:border-white/30">
+              <Button type="submit" variant="secondary" size="sm">
                 Book expense
-              </button>
+              </Button>
             </form>
           )}
 
           {row.status !== "booked" && row.status !== "dismissed" && (
             <form action={dismissAction}>
               <input type="hidden" name="captureId" value={row.id} />
-              <button className="text-xs opacity-60 underline-offset-2 hover:underline">
+              <button
+                type="submit"
+                className="text-xs text-muted underline-offset-2 hover:text-foreground hover:underline"
+              >
                 Dismiss
               </button>
             </form>

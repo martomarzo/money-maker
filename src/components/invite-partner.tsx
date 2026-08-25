@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createInvite } from "@/lib/actions/household";
+import { Button, ErrorText } from "@/components/ui";
 
 export function InvitePartner() {
   const [isPending, startTransition] = useTransition();
@@ -30,27 +31,30 @@ export function InvitePartner() {
 
   return (
     <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        onClick={handleInvite}
-        disabled={isPending}
-        className="self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-      >
+      <Button type="button" onClick={handleInvite} disabled={isPending} className="self-start">
         {isPending ? "Creating invite..." : "Invite partner"}
-      </button>
+      </Button>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {joinUrl && (
-        <div className="flex flex-col gap-2 rounded-md border border-black/10 p-3 text-sm dark:border-white/15">
-          <code className="break-all text-black/80 dark:text-white/80">{joinUrl}</code>
-          <button
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-muted p-3 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            readOnly
+            value={joinUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="w-full flex-1 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-muted outline-none focus:border-accent focus:ring-2 focus:ring-ring"
+          />
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleCopy}
-            className="self-start rounded-md border border-black/10 px-3 py-1.5 text-xs font-medium dark:border-white/15"
+            className="shrink-0"
           >
-            {copied ? "Copied" : "Copy link"}
-          </button>
+            {copied ? "Copied" : "Copy"}
+          </Button>
         </div>
       )}
     </div>
