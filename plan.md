@@ -227,7 +227,7 @@ user does not want to depend on configuring a third-party phone automation
 from the main nav, labelled as such in-page); no further parser work is
 planned. Capture now happens **natively in the app** — see Phase 1.8.
 
-### Phase 1.8 — Native quick capture (started 2026-08-25; dashboard hub done, quick-add screen after Phase 1.9)
+### Phase 1.8 — Native quick capture (DONE 2026-08-25)
 
 Logging an expense must be the fastest thing the app does, with nothing to
 configure outside it. Technical reality: a web app cannot read Google Wallet /
@@ -243,10 +243,14 @@ surface — one tap from the home screen, one screen to fill, done.
   (`src/app/icon.svg`, `apple-icon.png`, `favicon.ico`, `public/icons/*`),
   theme-color, standalone display — "Add to Home Screen" gives an app icon
   that opens straight onto the capture hub.
-- **Next:** a dedicated one-handed quick-add screen (amount keypad → category
-  grid → account chip → save; defaults remembered per device) — this is the
-  Phase 2 "Quick add" screen pulled forward; then offline queueing in Phase 2
-  makes it work without signal.
+- **Quick-add screen (done 2026-08-25):** `/add` (`src/components/quick-add.tsx`)
+  — big amount display with an on-screen keypad on mobile (decimal key hidden
+  for zero-decimal currencies), account chips, category grid sorted by usage,
+  optional payee/date, save keeps you on the screen for the next entry with a
+  "Saved …" toast. Last account + category usage counts live in
+  `localStorage` (`mm.quickadd.v1`). All `+` / "Add expense" entry points go
+  here; "Full form" links to `/transactions/new`. Offline queueing (Phase 2)
+  will hook in here.
 - **Later, optional:** if true auto-capture is ever wanted, the only path
   that needs no third-party config is a small native Android companion app
   (NotificationListenerService) posting to the existing

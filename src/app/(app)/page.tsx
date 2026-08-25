@@ -28,7 +28,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ButtonLink
-            href="/transactions/new?type=expense"
+            href="/add"
             size="lg"
             className="!bg-on-accent !text-accent-strong hover:!bg-white/90"
           >
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
               title="Nothing logged yet"
               description="Your latest expenses and income will show up here."
               action={
-                <ButtonLink href="/transactions/new?type=expense" size="sm">
+                <ButtonLink href="/add" size="sm">
                   Add expense
                 </ButtonLink>
               }

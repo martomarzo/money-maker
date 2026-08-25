@@ -76,7 +76,7 @@ export function AppShell({
 
           <div className="flex items-center gap-2">
             <Link
-              href="/transactions/new"
+              href="/add"
               className="hidden h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-on-accent hover:bg-accent-strong md:inline-flex"
             >
               <PlusIcon className="h-4 w-4" />
@@ -99,7 +99,7 @@ export function AppShell({
           ))}
           <div className="flex items-center justify-center">
             <Link
-              href="/transactions/new"
+              href="/add"
               aria-label="Add expense"
               className="-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-on-accent shadow-lg shadow-accent/30 ring-4 ring-background"
             >
