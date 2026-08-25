@@ -79,6 +79,16 @@ Rules:
 
 ### Personal vs shared
 
+> **Superseded 2026-08-25** — replaced by the personal-ledger model in
+> `docs/superpowers/specs/2026-08-25-personal-ledger-and-households.md`
+> (Phase 1.9). Summary: every account/category/transaction belongs to a
+> *user*, never a household; a transaction is made visible to at most one
+> household by an explicit `transaction_shares` row carrying a per-member
+> split (default even). The `visibility` flag and `accounts.owner_user_id`
+> go away. The text below describes the original design and is kept for
+> history.
+
+
 - Accounts with `owner_user_id = NULL` are joint — both partners see them and their transactions.
 - Personal accounts are visible only to their owner, **except** transactions on them marked `visibility: shared` also appear in household reports/budgets (e.g. "I paid the plumber from my personal card, but it's a household expense").
 - Budgets live at household level; a "personal budgets" view filters to your own stuff.
@@ -217,7 +227,7 @@ user does not want to depend on configuring a third-party phone automation
 from the main nav, labelled as such in-page); no further parser work is
 planned. Capture now happens **natively in the app** — see Phase 1.8.
 
-### Phase 1.8 — Native quick capture (started 2026-08-25, priority #1)
+### Phase 1.8 — Native quick capture (started 2026-08-25; dashboard hub done, quick-add screen after Phase 1.9)
 
 Logging an expense must be the fastest thing the app does, with nothing to
 configure outside it. Technical reality: a web app cannot read Google Wallet /
@@ -252,6 +262,21 @@ light + dark). Shared primitives in `src/components/ui.tsx` (`Button`,
 sticky header with logo mark, desktop nav, mobile bottom tab bar
 (Home / Transactions / + / Accounts / Settings). Every page uses the
 primitives; no raw `black/white` opacity classes remain.
+
+### Phase 1.9 — Personal ledger & households (agreed 2026-08-25, NEXT — before 1.8 quick-add and 1.6 budgets)
+
+Fundamental restructure, decided with the user 2026-08-25 after the
+"personal by default" question: **all data is private to its user; sharing
+into a household is an explicit per-transaction act that keeps the
+transaction in the personal ledger.** Enables multiple households per user.
+Decisions: full amount is shared, split evenly among members by default and
+editable by the owner; one household per transaction max; categories stay
+personal (household sees the sharer's category name); base currency per user
+*and* per household; existing data becomes the user's personal ledger with
+zero shares; personal budgets first, household budgets later; member
+balances shown read-only, settle-up action later.
+**Full spec + migration plan + build order:**
+`docs/superpowers/specs/2026-08-25-personal-ledger-and-households.md`.
 
 ### Phase 2 — Offline PWA
 - IndexedDB cache + outbox, sync push/pull endpoints, service worker, manifest.
