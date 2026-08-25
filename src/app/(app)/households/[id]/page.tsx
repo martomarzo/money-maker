@@ -5,19 +5,7 @@ import { getRate } from "@/lib/fx";
 import { formatCents, toCents } from "@/lib/domain/money";
 import { ButtonLink, Card, CardTitle, EmptyState, PageHeader } from "@/components/ui";
 import { formatDateHeading } from "@/components/transaction-row";
-
-function monthBounds(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  const from = `${month}-01`;
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return { from, to: `${month}-${String(last).padStart(2, "0")}` };
-}
-
-function shiftMonth(month: string, delta: number) {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
+import { monthBounds, shiftMonth } from "@/lib/reports";
 
 export default async function HouseholdPage({
   params,

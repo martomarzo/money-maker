@@ -21,6 +21,7 @@ const primaryNav: NavItem[] = [
 const secondaryNav: NavItem[] = [
   { href: "/accounts", label: "Accounts", icon: WalletIcon },
   { href: "/import", label: "Import", icon: ListIcon },
+  { href: "/budgets", label: "Budgets", icon: ListIcon },
 ];
 
 function isActive(pathname: string, href: string, match?: string) {

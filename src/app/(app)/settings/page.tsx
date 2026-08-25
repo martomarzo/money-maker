@@ -18,6 +18,7 @@ export default async function SettingsPage() {
         <CardTitle>More</CardTitle>
         <ul className="flex flex-col divide-y divide-border">
           {[
+            { href: "/budgets", label: "Budgets" },
             { href: "/settings/categories", label: "Categories & rules" },
             { href: "/accounts", label: "Accounts" },
             { href: "/import", label: "Import bank statements" },

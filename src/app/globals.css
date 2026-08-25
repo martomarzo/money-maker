@@ -22,6 +22,10 @@
   --warning: #b45309;
   --danger: #b91c1c;
   --ring: rgba(15, 118, 110, 0.35);
+  /* Chart series (validated with the dataviz palette checker, light+dark). */
+  --chart-expense: #0d9488;
+  --chart-income: #d97706;
+  --chart-track: #e5e1d8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -43,6 +47,9 @@
     --warning: #fbbf24;
     --danger: #f87171;
     --ring: rgba(45, 212, 191, 0.4);
+    --chart-expense: #0d9488;
+    --chart-income: #d97706;
+    --chart-track: #2d2e29;
   }
 }
 
@@ -64,6 +71,9 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-ring: var(--ring);
+  --color-chart-expense: var(--chart-expense);
+  --color-chart-income: var(--chart-income);
+  --color-chart-track: var(--chart-track);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }

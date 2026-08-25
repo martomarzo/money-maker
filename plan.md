@@ -180,7 +180,7 @@ Real history lives in Revolut, Wise, Itaú (Paraguay), and Santander (Argentina)
 
 **Milestone: full multi-bank history in the app; reports reflect reality.**
 
-### Phase 1.6 — Dashboard & budgets (pulled forward from Phase 3, planned 2026-08-09)
+### Phase 1.6 — Dashboard & budgets (DONE 2026-08-25)
 
 Decision: with real history imported, the dashboard and budgets deliver more value now than offline support — Phase 3's reporting core moves ahead of the PWA work.
 
@@ -200,7 +200,18 @@ Decision: with real history imported, the dashboard and budgets deliver more val
 - Actions: upsert/delete budget, "copy last month" rollover.
 - Personal-budget filtered view stays in Phase 3.
 
-Import-review follow-ups from first real use land here too (e.g. "needs review"/uncategorized filter in the transactions list).
+As built (2026-08-25): aggregates in `src/lib/reports.ts` (`periodTotals`,
+`totalsByCategory` with parent roll-up, `monthlyTrend`, `budgetsForMonth`,
+`netWorth`); dashboard `/` = capture hero → **Your money** (net worth in base
+currency at today's rate, accounts grouped by currency with subtotals) →
+month selector → KPI tiles → expenses/income by category bars (single hue,
+direct labels, click-through) → 12-month grouped-column trend (hand-rolled
+SVG, hover tooltip, legend, table view; chart colors `--chart-expense`
+teal / `--chart-income` amber validated colorblind-safe in light+dark) →
+recent. `/budgets`: month picker, per-category inline budget input (base
+currency, empty clears), meter with over-budget state, summary, copy-last-
+month (`src/lib/actions/budgets.ts`). Household budgets and a "needs review"
+filter remain open.
 
 ### Phase 1.7 — Wallet capture (built 2026-08-19 — SUPERSEDED 2026-08-25, kept as experimental)
 
