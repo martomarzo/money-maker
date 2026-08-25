@@ -96,7 +96,6 @@ export async function categorizeAllMatching(
         and(
           eq(transactions.userId, userId),
           isNull(transactions.deletedAt),
-          ne(transactions.type, "transfer"),
           matches,
           options.overwrite
             ? or(isNull(transactions.categoryId), ne(transactions.categoryId, categoryId))

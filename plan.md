@@ -219,7 +219,10 @@ month (`src/lib/actions/budgets.ts`). Household budgets remain open.
 (`src/lib/actions/categorize.ts`). The edit form adds "rename them too" /
 "give them this category too" for all rows with the same payee. The category
 filter has an "Uncategorized" option and the dashboard's Uncategorized bar
-links to it.
+links to it. **Transfers are editable too** (`src/lib/actions/transfers.ts`,
+`src/components/transfer-edit-form.tsx`): date (both legs), name, notes,
+category; unlink a pair; convert an unlinked leg to expense/income; and the
+reverse "mark as transfer" on expense/income rows.
 
 ### Phase 1.7 — Wallet capture (built 2026-08-19 — SUPERSEDED 2026-08-25, kept as experimental)
 

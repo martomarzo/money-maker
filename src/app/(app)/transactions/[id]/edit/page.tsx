@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, transactions } from "@/db/schema";
@@ -12,6 +12,8 @@ import {
 } from "@/lib/queries";
 import { toCents } from "@/lib/domain/money";
 import { ShareSheet } from "@/components/share-sheet";
+import { TransferEditForm } from "@/components/transfer-edit-form";
+import { ConvertToTransfer } from "@/components/convert-to-transfer";
 import { TransactionForm } from "@/components/transaction-form";
 import { Card, CardTitle, PageHeader } from "@/components/ui";
 
@@ -25,7 +27,48 @@ export default async function EditTransactionPage({
 
   const existing = await ownTransaction(userId, id);
   if (!existing) notFound();
-  if (existing.type === "transfer") redirect("/transactions");
+
+  if (existing.type === "transfer") {
+    const currency = existing.currency.trim();
+    const [account, categories, peer] = await Promise.all([
+      db.query.accounts.findFirst({ where: eq(accounts.id, existing.accountId) }),
+      listCategories(userId),
+      existing.transferPeerId
+        ? db
+            .select({ id: transactions.id, amount: transactions.amount, currency: transactions.currency, accountName: accounts.name })
+            .from(transactions)
+            .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+            .where(and(eq(transactions.id, existing.transferPeerId), isNull(transactions.deletedAt)))
+            .then((r) => r[0] ?? null)
+        : Promise.resolve(null),
+    ]);
+    return (
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6">
+        <PageHeader title="Edit transfer" />
+        <TransferEditForm
+          leg={{
+            id: existing.id,
+            amountCents: toCents(existing.amount, currency),
+            currency,
+            date: existing.date,
+            payee: existing.payee,
+            notes: existing.notes,
+            categoryId: existing.categoryId,
+            accountName: account?.name ?? "",
+            peer: peer
+              ? {
+                  id: peer.id,
+                  accountName: peer.accountName,
+                  amountCents: toCents(peer.amount, peer.currency.trim()),
+                  currency: peer.currency.trim(),
+                }
+              : null,
+          }}
+          categories={categories}
+        />
+      </div>
+    );
+  }
 
   const [account, userAccounts, categories, households, share] = await Promise.all([
     db.query.accounts.findFirst({ where: eq(accounts.id, existing.accountId) }),
@@ -81,6 +124,7 @@ export default async function EditTransactionPage({
             currentUserId={userId}
           />
         </Card>
+        <ConvertToTransfer transactionId={existing.id} />
         <TransactionForm
           accounts={formAccounts}
           categories={categories}

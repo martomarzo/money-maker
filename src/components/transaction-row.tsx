@@ -61,7 +61,6 @@ export function TransactionRowItem({
   categories?: PickerCategory[];
 }) {
   const { transaction: t, accountName, categoryName, categoryIcon, share } = row;
-  const isTransfer = t.type === "transfer";
   const label = t.payee ?? categoryName ?? typeLabel(t.type);
   const icon = categoryIcon ?? typeMarker(t.type);
   const meta = [showDate ? t.date : null, accountName].filter(Boolean).join(" · ");
@@ -88,10 +87,6 @@ export function TransactionRowItem({
 
   const className =
     "flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 transition-colors";
-
-  if (isTransfer) {
-    return <div className={className}>{content}</div>;
-  }
 
   if (categories) {
     // List view: the label links to the editor; the picker sits beside it
