@@ -71,6 +71,7 @@ export async function listAccountsWithBalances(userId: string) {
 export interface TransactionFilters {
   accountId?: string;
   categoryId?: string;
+  uncategorized?: boolean;
   type?: "expense" | "income" | "transfer";
   shared?: "yes" | "no";
   from?: string; // ISO date, inclusive
@@ -108,6 +109,7 @@ export async function listTransactions(
         isNull(transactions.deletedAt),
         filters.accountId ? eq(transactions.accountId, filters.accountId) : undefined,
         filters.categoryId ? eq(transactions.categoryId, filters.categoryId) : undefined,
+        filters.uncategorized ? isNull(transactions.categoryId) : undefined,
         filters.type ? eq(transactions.type, filters.type) : undefined,
         filters.shared === "yes" ? sql`${transactionShares.id} is not null` : undefined,
         filters.shared === "no" ? sql`${transactionShares.id} is null` : undefined,

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts } from "@/db/schema";
+import { accounts, transactions } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import {
   getShareForTransaction,
@@ -36,6 +36,22 @@ export default async function EditTransactionPage({
   ]);
   const shareHousehold = share ? households.find((h) => h.id === share.householdId) : null;
 
+  let samePayeeCount = 0;
+  if (existing.payee) {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          isNull(transactions.deletedAt),
+          eq(transactions.payee, existing.payee),
+          ne(transactions.id, existing.id),
+        ),
+      );
+    samePayeeCount = Number(count);
+  }
+
   const formAccounts = userAccounts
     .filter((a) => !a.archived)
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency.trim() }));
@@ -68,6 +84,7 @@ export default async function EditTransactionPage({
         <TransactionForm
           accounts={formAccounts}
           categories={categories}
+          samePayeeCount={samePayeeCount}
           transaction={{
             id: existing.id,
             type: existing.type,

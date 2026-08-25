@@ -74,7 +74,8 @@ export default async function TransactionsPage({
     listCategories(userId),
     listTransactions(userId, {
       accountId: accountParam,
-      categoryId: categoryParam,
+      categoryId: categoryParam === "none" ? undefined : categoryParam,
+      uncategorized: categoryParam === "none",
       type: isTransactionType(typeParam) ? typeParam : undefined,
       shared,
       from: fromParam,
@@ -83,6 +84,12 @@ export default async function TransactionsPage({
   ]);
 
   const summary = summarizeTransactions(rows, baseCurrency);
+  const pickerCategories = categories.map((c) => ({
+    id: c.id,
+    parentId: c.parentId,
+    name: c.name,
+    icon: c.icon,
+  }));
 
   const formAccounts = allAccounts
     .filter((a) => !a.archived)
@@ -133,7 +140,7 @@ export default async function TransactionsPage({
               </h2>
               <div className="flex flex-col gap-2">
                 {dateRows.map((row) => (
-                  <TransactionRowItem key={row.transaction.id} row={row} />
+                  <TransactionRowItem key={row.transaction.id} row={row} categories={pickerCategories} />
                 ))}
               </div>
             </div>

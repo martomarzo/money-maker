@@ -210,8 +210,16 @@ SVG, hover tooltip, legend, table view; chart colors `--chart-expense`
 teal / `--chart-income` amber validated colorblind-safe in light+dark) →
 recent. `/budgets`: month picker, per-category inline budget input (base
 currency, empty clears), meter with over-budget state, summary, copy-last-
-month (`src/lib/actions/budgets.ts`). Household budgets and a "needs review"
-filter remain open.
+month (`src/lib/actions/budgets.ts`). Household budgets remain open.
+
+**Categorizing imported history (2026-08-25):** every non-transfer row in
+`/transactions` has an inline category select; changing it offers a one-tap
+"Always for “<payee>”" that stores a `category_rule` and back-fills every
+*uncategorized* row whose payee/notes contain that text
+(`src/lib/actions/categorize.ts`). The edit form adds "rename them too" /
+"give them this category too" for all rows with the same payee. The category
+filter has an "Uncategorized" option and the dashboard's Uncategorized bar
+links to it.
 
 ### Phase 1.7 — Wallet capture (built 2026-08-19 — SUPERSEDED 2026-08-25, kept as experimental)
 

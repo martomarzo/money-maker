@@ -14,7 +14,7 @@ interface CategoryBarsProps {
 
 function rowHref(categoryId: string | null, range?: { from: string; to: string }) {
   const params = new URLSearchParams();
-  if (categoryId) params.set("category", categoryId);
+  params.set("category", categoryId ?? "none");
   if (range) {
     params.set("from", range.from);
     params.set("to", range.to);

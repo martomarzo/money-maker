@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { TransactionListRow } from "@/lib/queries";
 import { formatCents, toCents } from "@/lib/domain/money";
 import { Badge } from "@/components/ui";
+import { RowCategoryPicker, type PickerCategory } from "@/components/row-category-picker";
 
 export type TransactionType = "expense" | "income" | "transfer";
 export type TransactionRow = TransactionListRow;
@@ -52,9 +53,12 @@ export function amountColorClass(type: TransactionType): string {
 export function TransactionRowItem({
   row,
   showDate = false,
+  categories,
 }: {
   row: TransactionRow;
   showDate?: boolean;
+  /** When given, renders an inline category picker (list view). */
+  categories?: PickerCategory[];
 }) {
   const { transaction: t, accountName, categoryName, categoryIcon, share } = row;
   const isTransfer = t.type === "transfer";
@@ -87,6 +91,38 @@ export function TransactionRowItem({
 
   if (isTransfer) {
     return <div className={className}>{content}</div>;
+  }
+
+  if (categories) {
+    // List view: the label links to the editor; the picker sits beside it
+    // (interactive controls can't nest inside the link).
+    return (
+      <div className={`${className} hover:border-border-strong`}>
+        <Link href={`/transactions/${t.id}/edit`} className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-base">
+            {icon}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="flex items-center gap-2 truncate text-sm font-medium">
+              <span className="truncate">{label}</span>
+              {share && <Badge tone="accent">{share.householdName}</Badge>}
+            </span>
+            <span className="truncate text-xs text-muted">{meta}</span>
+          </span>
+        </Link>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`tnum text-sm font-semibold ${amountColorClass(t.type)}`}>
+            {formatSignedAmount(t.type, t.amount, t.currency)}
+          </span>
+          <RowCategoryPicker
+            transactionId={t.id}
+            categoryId={t.categoryId}
+            payee={t.payee}
+            categories={categories}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (

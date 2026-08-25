@@ -106,6 +106,7 @@ export function TransactionFilters({
         className={filterSelectClass}
       >
         <option value="">All categories</option>
+        <option value="none">Uncategorized</option>
         {parents.map((p) => {
           const children = childrenByParent.get(p.id) ?? [];
           const label = `${p.icon ? `${p.icon} ` : ""}${p.name}`;

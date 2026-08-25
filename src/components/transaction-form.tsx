@@ -42,6 +42,8 @@ interface TransactionFormProps {
   categories: CategoryOption[];
   transaction?: EditableTransaction;
   defaultMode?: Mode;
+  /** Edit mode: how many OTHER transactions share this payee (for bulk options). */
+  samePayeeCount?: number;
 }
 
 type Mode = "expense" | "income" | "transfer";
@@ -54,6 +56,7 @@ export function TransactionForm({
   categories,
   transaction,
   defaultMode,
+  samePayeeCount = 0,
 }: TransactionFormProps) {
   const router = useRouter();
   const isEdit = Boolean(transaction);
@@ -358,6 +361,22 @@ export function TransactionForm({
               defaultValue={transaction?.payee ?? ""}
               className={inputClass}
             />
+            {isEdit && transaction?.payee && samePayeeCount > 0 && (
+              <div className="mt-1 flex flex-col gap-1.5 rounded-lg bg-surface-muted px-3 py-2 text-xs text-muted">
+                <span>
+                  {samePayeeCount} other transaction{samePayeeCount === 1 ? "" : "s"} have the payee
+                  “{transaction.payee}”.
+                </span>
+                <label className="flex items-center gap-2 text-foreground">
+                  <input type="checkbox" name="renameAll" value="1" className="h-4 w-4 rounded border-border" />
+                  Rename them too
+                </label>
+                <label className="flex items-center gap-2 text-foreground">
+                  <input type="checkbox" name="categorizeAll" value="1" className="h-4 w-4 rounded border-border" />
+                  Give them this category too, and remember it as a rule
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1">

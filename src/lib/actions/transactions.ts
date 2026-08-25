@@ -11,6 +11,7 @@ import { getRate } from "@/lib/fx";
 import { usablePostingAccount } from "@/lib/queries";
 import { requireUser, requireUserId } from "@/lib/session";
 import type { ActionResult } from "./auth";
+import { categorizeAllMatching, renamePayeeEverywhere } from "./categorize";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date");
 
@@ -224,6 +225,18 @@ export async function updateTransaction(
       updatedAt: new Date(),
     })
     .where(eq(transactions.id, id));
+
+  // Bulk options (edit form): apply the category to all rows with the old
+  // payee (and remember it as a rule), and/or rename them all.
+  const oldPayee = existing.payee?.trim();
+  if (oldPayee) {
+    if (formData.get("categorizeAll") && parsed.data.categoryId) {
+      await categorizeAllMatching(oldPayee, parsed.data.categoryId, { overwrite: true });
+    }
+    if (formData.get("renameAll") && (parsed.data.payee ?? "") !== oldPayee) {
+      await renamePayeeEverywhere(oldPayee, parsed.data.payee ?? "");
+    }
+  }
 
   revalidatePath("/transactions");
   revalidatePath("/accounts");
